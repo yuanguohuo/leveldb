@@ -32,6 +32,14 @@ void Footer::EncodeTo(std::string* dst) const {
   const size_t original_size = dst->size();
   metaindex_handle_.EncodeTo(dst);
   index_handle_.EncodeTo(dst);
+
+  //Yuanguo: 
+  //  1. it seems that the input 'dst' should be empty or very small, otherwise, if it's very large, then 
+  //           original_size + encoded metaindex_handle_ + encoded index_handle_ > 2 * BlockHandle::kMaxEncodedLength
+  //     and the resize here corrupts data; 
+  //  2. assume original_size = 0
+  //           encoded metaindex_handle_ + encoded index_handle_ < 2 * BlockHandle::kMaxEncodedLength
+  //     and the resize here is just padding some data;
   dst->resize(2 * BlockHandle::kMaxEncodedLength);  // Padding
   PutFixed32(dst, static_cast<uint32_t>(kTableMagicNumber & 0xffffffffu));
   PutFixed32(dst, static_cast<uint32_t>(kTableMagicNumber >> 32));

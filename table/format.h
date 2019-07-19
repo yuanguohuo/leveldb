@@ -80,6 +80,14 @@ static const size_t kBlockTrailerSize = 5;
 
 struct BlockContents {
   Slice data;           // Actual contents of data
+  //Yuanguo:
+  //  1. if the underlying file is mmapped and block is not compressed: 'data' is just a pointer to the mmap 
+  //     area; so don't cache it (already cached by kernel mmap), and it's not heap allocated (don't delete it)
+  //  2. if the underlying file is not mmapped, 'data' is heap allocated, so it's cacheable and needs to be 
+  //     deleted; 
+  //  3. if the underlying file is mmapped but block is compressed: the original content is a pointer to mmap, 
+  //     but it should be decompressed; so 'data' heap allocated, and it stores the decompressed block content;
+  //     as a result, it's cacheable and needs to be deleted; 
   bool cachable;        // True iff data can be cached
   bool heap_allocated;  // True iff caller should delete[] data.data()
 };

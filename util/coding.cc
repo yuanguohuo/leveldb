@@ -52,6 +52,17 @@ void PutVarint32(std::string* dst, uint32_t v) {
   dst->append(buf, ptr - buf);
 }
 
+//Yuanguo:
+//    +--------+--------+            +--------+
+//    |1 7bits |1 7bits |   ......   |0 7bits |
+//    +--------+--------+            +--------+
+//          ^                             ^
+//          |                             |
+// the lowest 7 bits of v            the highest 7 bits of v
+//
+// 1. the output is a variable length string: the smaller v is, the shorter the output string is;
+// 2. the output has 10 chars at most: 64/7 = 9, so at most 9 leading '1' will be added, and 73
+//    bits need 10 chars;
 char* EncodeVarint64(char* dst, uint64_t v) {
   static const int B = 128;
   uint8_t* ptr = reinterpret_cast<uint8_t*>(dst);
@@ -63,6 +74,9 @@ char* EncodeVarint64(char* dst, uint64_t v) {
   return reinterpret_cast<char*>(ptr);
 }
 
+//Yuanguo: 
+//  see EncodeVarint64
+//  GetVarint64 is the opposite operation; 
 void PutVarint64(std::string* dst, uint64_t v) {
   char buf[10];
   char* ptr = EncodeVarint64(buf, v);
