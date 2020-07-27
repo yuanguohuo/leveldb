@@ -438,6 +438,12 @@ bool Version::RecordReadSample(Slice internal_key) {
 
   State state;
   state.matches = 0;
+
+  // Yuanguo: for each file overlapping with `ikey`, call `State::Match`;
+  //   if there're more than one 
+  //       state.matches will be >=2, and 
+  //       state.stats.seek_file = the first one;
+  //   (note: multiple files overlapping with one key ==> compactable)
   ForEachOverlapping(ikey.user_key, internal_key, &state, &State::Match);
 
   // Must have at least two matches since we want to merge across
@@ -446,6 +452,11 @@ bool Version::RecordReadSample(Slice internal_key) {
   // finding such files?
   if (state.matches >= 2) {
     // 1MB cost is about 1 seek (see comment in Builder::Apply).
+
+    // Yuanguo: multiple files overlapping with one key ==> compactable
+    //   but not set compactable immediately, instead, 
+    //        1. decrement `allowed_seeks`;
+    //        2. when `allowed_seeks` down to 0, set compactable (`file_to_compact_` and `file_to_compact_level_`);
     return UpdateStats(state.stats);
   }
   return false;
@@ -468,9 +479,11 @@ bool Version::OverlapInLevel(int level, const Slice* smallest_user_key,
                                smallest_user_key, largest_user_key);
 }
 
+//Yuanguo: at which level shall we flush a memtable [smallest_user_key, largest_user_key]?
 int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                         const Slice& largest_user_key) {
   int level = 0;
+  //Yuanguo: if overlap with Level-0, then reutrn 0;
   if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
     // Push to next level if there is no overlap in next level,
     // and the #bytes overlapping in the level after that are limited.
@@ -478,9 +491,11 @@ int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
     InternalKey limit(largest_user_key, 0, static_cast<ValueType>(0));
     std::vector<FileMetaData*> overlaps;
     while (level < config::kMaxMemCompactLevel) {
+      //Yuanguo: if overlap with Level `level+1`, return `level`;
       if (OverlapInLevel(level + 1, &smallest_user_key, &largest_user_key)) {
         break;
       }
+      //Yuanguo: not overlap with Level `level+1`, but overlap too many with `level+2`, return `level`;
       if (level + 2 < config::kNumLevels) {
         // Check that file does not overlap too many grandparent bytes.
         GetOverlappingInputs(level + 2, &start, &limit, &overlaps);

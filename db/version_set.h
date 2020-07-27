@@ -72,6 +72,12 @@ class Version {
   // REQUIRES: This version has been saved (see VersionSet::SaveTo)
   void AddIterators(const ReadOptions&, std::vector<Iterator*>* iters);
 
+  // Yuanguo: get "key" from current version:
+  //  for each level: 0, 1, 2, ...
+  //      get from the level:
+  //            if found, return; 
+  //            if kDeleted found, return NotFound;
+  //  return NotFound (not found in all levels)
   Status Get(const ReadOptions&, const LookupKey& key, std::string* val,
              GetStats* stats);
 
@@ -84,6 +90,14 @@ class Version {
   // Samples are taken approximately once every config::kReadBytesPeriod
   // bytes.  Returns true if a new compaction may need to be triggered.
   // REQUIRES: lock is held
+  //
+  // Yuanguo: for Key "key", 
+  // if there're more than one files overlapping with it (smallest <= key <= largest), 
+  //     say they are f1, f2, ... (multiple in level-0 and/or in multiple levels), f1
+  //     is the newest; (multiple files overlapping with one key ==> compactable)
+  // then, call "UpdateStats" on f1, that's to
+  //     f1->allowed_seeks--; and if down to 0, return true, meaning that a compaction may need to
+  //     be triggered (this->file_to_compact_ = f1; this->file_to_compact_level_ = level of f1);
   bool RecordReadSample(Slice key);
 
   // Reference count management (so Versions do not disappear out from
@@ -106,6 +120,12 @@ class Version {
 
   // Return the level at which we should place a new memtable compaction
   // result that covers the range [smallest_user_key,largest_user_key].
+  //
+  // Yuanguo: when we want to flush a memtable ([smallest_user_key,largest_user_key]), which level shall we flush it at?
+  //    1. if the memtable overlaps with Level-0, then flush it at Level-0;
+  //    2. else, not overlap with Level-0, but overlap with Level-N+1, then flush it at Level-N;
+  //    3. else, not overlap with Level-N+1, but overlaps too many with Level-N+2, then flush it at Level-N;
+  //    otherwise, N++;
   int PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                  const Slice& largest_user_key);
 
@@ -142,6 +162,12 @@ class Version {
   // false, makes no more calls.
   //
   // REQUIRES: user portion of internal_key == user_key.
+  // 
+  // Yuanguo:
+  //    for each level "l" in 0, 1, ... 
+  //        for each file "f" in the level "l" (file number high to low)
+  //            if user_key in [file.smallest, file.largest], call func(arg, l, f)
+  //    stop when func() returns false;
   void ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                           bool (*func)(void*, int, FileMetaData*));
 
