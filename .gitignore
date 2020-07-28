@@ -6,3 +6,12 @@
 # Build directory.
 build/
 out/
+
+# Yuanguo added 
+.cscope.files
+.cscope.out
+.cscope.out.in
+.cscope.out.po
+.filenametags
+.tags
+rebuild_workspace.sh
