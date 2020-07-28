@@ -535,6 +535,34 @@ void Version::GetOverlappingInputs(int level, const InternalKey* begin,
       // "f" is completely after specified range; skip it
     } else {
       inputs->push_back(f);
+
+      //Yuanguo: it's very clear for for level != 0;
+      //  for, level==0:
+      //                           user_begin       user_end
+      //                              |               |
+      //           f1s         f1l    |               |
+      // file-1    |------------|     |               |
+      //                              |               |
+      //                              |               |        f2s      f2l
+      // file-2                       |               |         |--------|
+      //                              |               |
+      //               f3s            |       f3l     |
+      // file-3         |-------------+--------|      |
+      //                              |               |
+      //                              |     f4s       |            f4l
+      // file-4                       |      |--------+-------------|
+      //                              |               |       
+      //                              |               |                       f5s    f5l
+      // file-5                       |               |                         |-----|
+      //
+      //
+      // a. file-1 and file-2 are skipped at first;
+      // b. but, when file-3 is encountered `user_begin` is set to `f3s` (file-3-start), and restart 
+      //    search, so file-1 will be included and `user_begin` will be set to `f1s` and restart search again;
+      // c. when file-4 is encountered, `user_end` is set to `f4l` (file-4-limit) and restart search,
+      //    as a result, file-2 will be included and `user_end` will be set to `f2l`;
+      // d. file-5 will never be included;
+
       if (level == 0) {
         // Level-0 files may overlap each other.  So check if the newly
         // added file has expanded the range.  If so, restart search.
@@ -582,9 +610,21 @@ std::string Version::DebugString() const {
 // A helper class so we can efficiently apply a whole sequence
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
+//
+// Yuanguo: apply a sequence of edits (added files or deleted files) to 
+//   version `base_` (or called current), forming a new version `v`, see how it's used in 
+//   `VersionSet::LogAndApply`:
+//
+//       a. expand the edits, and store them in `LevelState levels_`, where
+//          each level keeps its added/deleted files (changes or edits), see function `Apply`;
+//       b. merge `base_` and these edits, saving to version `v`, see function `SaveTo`;
+//
+//   that is, `base_` ----> edit1, edit2, edit3, ... editN ----> `v`, without intermediate versions like
+//            `base_` ----> edit1 ----> `v1` ----> edit2 ----> `v2` ----> ... ---> `v`
 class VersionSet::Builder {
  private:
   // Helper to sort by v->files_[file_number].smallest
+  // Yuanguo: comparator for std::set
   struct BySmallestKey {
     const InternalKeyComparator* internal_comparator;
 
@@ -698,15 +738,28 @@ class VersionSet::Builder {
       v->files_[level].reserve(base_files.size() + added_files->size());
       for (const auto& added_file : *added_files) {
         // Add all smaller files listed in base_
+        //
+        // Yuanguo: std::upper_bound returns first element in [`base_iter`, `base_end`) that's 
+        //   greater than `added_file`; 
+        //   for example, base_files = [10, 12, 15, 18, 23, 28, 30, 31]
+        //                added_file = 16;
+        //                then bpos = 18;
+        //   then [10, 12, 15] may be added to `v`
+        //
+        //   For next round of loop, added_file = 29, 
+        //                then bpos = 30
+        //   then [18, 23, 28] may be added to `v`
         for (std::vector<FileMetaData*>::const_iterator bpos =
                  std::upper_bound(base_iter, base_end, added_file, cmp);
              base_iter != bpos; ++base_iter) {
           MaybeAddFile(v, level, *base_iter);
         }
 
+        // Yuanguo: add 16, 29 respectively
         MaybeAddFile(v, level, added_file);
       }
 
+      // Yuanguo: add 30, 31
       // Add remaining base files
       for (; base_iter != base_end; ++base_iter) {
         MaybeAddFile(v, level, *base_iter);
@@ -780,6 +833,7 @@ void VersionSet::AppendVersion(Version* v) {
   if (current_ != nullptr) {
     current_->Unref();
   }
+  //Yuanguo: the last appended is the `current_`;
   current_ = v;
   v->Ref();
 
@@ -790,6 +844,23 @@ void VersionSet::AppendVersion(Version* v) {
   v->next_->prev_ = v;
 }
 
+// Yuanguo: `current_` = apply `edit` on `current_`; `mu` is locked when calling this method;
+//     1. `v` = apply `edit` on `current_`; See Builder;
+//     2. create file `new_manifest_file` (MANIFEST-XXXXXX);
+//     3. save SNAPSHOT (that is the `current_`, the base version) into `new_manifest_file`; NOTICE: SNAPSHOT (a version)
+//        is also expressed by a VersionEdit object, see function `WriteSnapshot`;
+//     4. unlock `mu`;
+//     5. save LOG (that is `edit`) into `new_manifest_file`;
+//     6. sync `new_manifest_file` and save its name in "dbname/CURRENT" atomically (by save tmp file and rename);
+//     7. lock `mu`;
+//     8. AppendVersion(v), that is `current_ = v`;
+// NOTICE: 
+//     a. version transition: persist it first, then update it in memory;
+//     b. essentially, this is "SNAPSHOT + LOG" model; base version is SNAPSHOT, `edit` is a list of LOGs; When
+//        recover (see function VersionSet::Recover): 
+//               read name of `new_manifest_file` from "dbname/CURRENT";
+//               read content of `new_manifest_file`, which is "SNAPSHOT + LOGs";
+//               apply the edit on base version, and then we get current version;
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->has_log_number_) {
     assert(edit->log_number_ >= log_number_);
@@ -875,6 +946,7 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
+// Yuanguo: see my comments for VersionSet::LogAndApply() above;
 Status VersionSet::Recover(bool* save_manifest) {
   struct LogReporter : public log::Reader::Reporter {
     Status* status;

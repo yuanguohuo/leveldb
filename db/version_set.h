@@ -84,6 +84,7 @@ class Version {
   // Adds "stats" into the current state.  Returns true if a new
   // compaction may need to be triggered, false otherwise.
   // REQUIRES: lock is held
+  // Yuanguo: see my comments for RecordReadSample();
   bool UpdateStats(const GetStats& stats);
 
   // Record a sample of bytes read at the specified internal key.
@@ -97,7 +98,7 @@ class Version {
   //     is the newest; (multiple files overlapping with one key ==> compactable)
   // then, call "UpdateStats" on f1, that's to
   //     f1->allowed_seeks--; and if down to 0, return true, meaning that a compaction may need to
-  //     be triggered (this->file_to_compact_ = f1; this->file_to_compact_level_ = level of f1);
+  //     be triggered, thus set compactable (this->file_to_compact_ = f1; this->file_to_compact_level_ = level of f1);
   bool RecordReadSample(Slice key);
 
   // Reference count management (so Versions do not disappear out from
@@ -164,9 +165,9 @@ class Version {
   // REQUIRES: user portion of internal_key == user_key.
   // 
   // Yuanguo:
-  //    for each level "l" in 0, 1, ... 
-  //        for each file "f" in the level "l" (file number high to low)
-  //            if user_key in [file.smallest, file.largest], call func(arg, l, f)
+  //    for each level "lvl" in 0, 1, ... 
+  //        for each file "fl" in the level "lvl" (file number high to low)
+  //            if user_key in [fl.smallest, fl.largest], call func(arg, lvl, fl)
   //    stop when func() returns false;
   void ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                           bool (*func)(void*, int, FileMetaData*));
