@@ -888,6 +888,12 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   // a temporary file that contains a snapshot of the current version.
   std::string new_manifest_file;
   Status s;
+
+  // Yuanguo: if descriptor_log_ != nullptr, there is an open manifest file, which
+  //   contains SNAPSHOT (a base version) and a sequence of LOG's (edit), so we don't
+  //   need to WriteSnapshot; this may happen when reuse manifest after recover; see
+  //        VersionSet::Recover --> 
+  //        VersionSet::ReuseManifest;
   if (descriptor_log_ == nullptr) {
     // No reason to unlock *mu here since we only hit this path in the
     // first call to LogAndApply (when opening the database).
