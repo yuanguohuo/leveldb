@@ -133,6 +133,26 @@ class InternalFilterPolicy : public FilterPolicy {
 // incorrectly use string comparisons instead of an InternalKeyComparator.
 class InternalKey {
  private:
+  // Yuanguo:  
+  //          +-------------------------------+--+--------------+
+  //      low |                               |  |              | high
+  //          +-------------------------------+--+--------------+
+  //                        user_key         type(1B)  seq(7B)    
+  //                         
+  //                                          |                 |
+  //                                          |                 |
+  //                                          V                 V
+  //                                                uint64_t
+  //                                          +--------------+--+
+  //                                          |              |  |
+  //                                          +--------------+--+
+  //                                         high              low
+  //
+  // Yuanguo: order by 
+  //      Primary   : user_key asending;
+  //      Secondary : seq+type descending; why?
+  // for example:
+  //      "A"|*|*   <   "B"|*|*   <   "C"|4|*   <   "C"|3|*
   std::string rep_;
 
  public:

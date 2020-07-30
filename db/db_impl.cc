@@ -884,6 +884,21 @@ Status DBImpl::InstallCompactionResults(CompactionState* compact) {
   return versions_->LogAndApply(compact->compaction->edit(), &mutex_);
 }
 
+// Yuanguo: to compact,
+//   1. create an instance of `class Compaction`, say `c` which contains 2 overlapping levels:
+//            inputs_[0]:  files in Level-N
+//            inputs_[1]:  files in Level-N+1
+//   2. create an instance of `CompactionState`, say `compact = new CompactionState(c);`
+//   3. call this function DoCompactionWork, passing in `compact`, which roughly,
+//         a. create `input`, which is a merging iterator on all files in `c.inputs_[0]` and `c.inputs_[0]`
+//         b. iterate over `input`, for each key, drop old versions and save latest version in a table builder;
+//         c. if builder->FileSize() large enough, close this builder (generating an output file) and create a new one;
+//         d. repeat b->c, until finished or should stop early (see func ShouldStopBefore);
+//         e. now we get a list of output files, then call InstallCompactionResults;
+//                i.   make a VersionEdit instance, say `edit` 
+//                ii.  add `c.inputs_[0]` and `c.inputs_[0]` in `edit.deleted_files_`
+//                iii. add output files in `edit.new_files_` on level `N+1`; So, commpation is from [N, N+1] ==> N+1
+//                iv.  versions_->LogAndApply(edit);
 Status DBImpl::DoCompactionWork(CompactionState* compact) {
   const uint64_t start_micros = env_->NowMicros();
   int64_t imm_micros = 0;  // Micros spent doing imm_ compactions
