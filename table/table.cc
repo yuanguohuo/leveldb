@@ -50,8 +50,8 @@ struct Table::Rep {
 //             |                                            |       |    |
 //             +--------------------------------------------+ <-----+----+------+
 //             |///////////// index block //////////////////|       |    |      |
-//             |// key1:block-1-handle /////////////////////| ------+----+      |
-//             |// key2:block-2-handle /////////////////////| ------+           |
+//             |// key1:block-1-handle (offset,size) ///////| ------+----+      |
+//             |// key2:block-2-handle (offset,size) ///////| ------+           |
 //             |// ... /////////////////////////////////////|                   |
 //             +--------------------------------------------+                   |
 //             |                                            |                   |
@@ -73,8 +73,8 @@ struct Table::Rep {
 //             |                                            |              |    |
 //             |                                            |              |    |
 //             +--------------------------------------------+              |    |
-//   Footer    |   metaindex handle                         | -------------+    |
-//             |   index handle                             | ------------------+
+//   Footer    |   metaindex handle (offset,size)           | -------------+    |
+//             |   index handle (offset,size)               | ------------------+
 //             +============================================+
 Status Table::Open(const Options& options, RandomAccessFile* file,
                    uint64_t size, Table** table) {

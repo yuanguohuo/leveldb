@@ -21,38 +21,34 @@ namespace leveldb {
 //
 //               data_  ----------->  +================================================+
 //                                    |                                                |
-//                                    |                     Entry                      |
-//                                    |                                                |
-//                                    +------------------------------------------------+
-//                                    |                                                |
-//                                    |                     Entry                      |  <-------------------+
-//                                    |                                                |                       |
-//                                    +------------------------------------------------+                       |
-//                                    |                                                |                       |
-//                                    |                                                |                       |
-//                                    |                     .....                      |                       |
-//                                    |                                                |                       |
-//                                    |                                                |                       |
-//                                    +------------------------------------------------+                       |
-//                                    |                                                |                       |
-//                                    |                     Entry                      |                       | 
-//                                    |                                                |                       |
-//                                    +------------------------------------------------+                       |
-//                                    |                                                |                       |
-//                                    |                                                |                       |
-//                                    |                                                |                       |
-//                                    |                                                |                       |
-//                                    |                                                |                       |
-// data_ + restart_offset_  ------->  +------------------------------------------------+                       |
-//                                    |              restart[0]                        |                       |
-//                                    +------------------------------------------------+                       |
-//                                    |              restart[1]                        |  ---------------------+
-//                                    +------------------------------------------------+
-//                                    |                                                |
-//                                    |              ......                            |
-//                                    |                                                |
-//                                    +------------------------------------------------+
-//                                    |              restart[NumRestarts-1]            |
+//                                    |                     Entry                      |  <----------------+
+//                                    |                                                |                   |
+//                                    +------------------------------------------------+                   |
+//                                    |                                                |                   |
+//                                    |                     Entry                      |  <----------------+---+
+//                                    |                                                |                   |   |
+//                                    +------------------------------------------------+                   |   |
+//                                    |                                                |                   |   |
+//                                    |                     .....                      |                   |   |
+//                                    |                                                |                   |   |
+//                                    +------------------------------------------------+                   |   |
+//                                    |                                                |                   |   |
+//                                    |                     Entry                      |  <----------------+---+---+
+//                                    |                                                |                   |   |   |
+//                                    +------------------------------------------------+                   |   |   |
+//                                    |                                                |                   |   |   |
+//                                    |                                                |                   |   |   |
+//                                    |                                                |                   |   |   |
+//                                    |                                                |                   |   |   |
+//                                    |                                                |                   |   |   |
+// data_ + restart_offset_  ------->  +------------------------------------------------+                   |   |   |
+//                                    |              restart[0]                        |  -----------------+   |   |
+//                                    +------------------------------------------------+                       |   |
+//                                    |              restart[1]                        |  ---------------------+   |
+//                                    +------------------------------------------------+                           |
+//                                    |              ......                            |                           |
+//                                    +------------------------------------------------+                           |
+//                                    |              restart[NumRestarts-1]            |  -------------------------+
 //                                    +------------------------------------------------+
 //                                    |              NumRestarts (Fixed32)             |
 //         data_ + size_  --------->  +================================================+
@@ -168,8 +164,82 @@ class Block::Iter : public Iterator {
   // current_ is offset in data_ of current entry.  >= restarts_ if !Valid
   uint32_t current_;
   uint32_t restart_index_;  // Index of restart block in which current_ falls
+
+  // Yuanguo: when iterating, `key_` stores the "key bytes" of current entry;
+  //     +------------------+-----------------------------------------+
+  //     |   shared-bytes   |            non-shared-bytes             |
+  //     +------------------+-----------------------------------------+
   std::string key_;
+
+  // Yuanguo: when iterating, `value_` points to the "value bytes" of current entry within the block; unlike `key_`, 
+  //   it doesn't store, by just point to (see class Slice);
+  //
+  // NOTICE: right after a seek (SeekToFirst, SeekToLast, Seek), `value_` doesn't point to the "value bytes", but point to
+  //   the start-point of current entry with size = 0; then ParseNextKey() is called, which makes `value_` right!
+  //   Plus, ParseNextKey() will try to skip "value bytes" first, and then start parsing; right after a seek, nothing is skipped 
+  //   because value size = 0; And when Next() is called, it skips "value bytes of prev entry" and parses current;
+  //
+  //   right after seek:
+  //
+  //               +------------------------------------------------+ <---- value_ (size = 0), nothing will be skipped
+  //               |    shared key bytes (1 byte < 128)             |       and parsing will be started here
+  //               +------------------------------------------------+
+  //               |    non shared key bytes (1 byte < 128)         |
+  //               +------------------------------------------------+
+  //               |    value length (1 byte < 128)                 |
+  //               +------------------------------------------------+ 
+  //               |                                                |
+  //               |                 non shared key                 |
+  //               |                                                |
+  //               +------------------------------------------------+
+  //               |                                                |
+  //               |                                                |
+  //               |                      value                     |
+  //               |                                                |
+  //               |                                                |
+  //               |                                                |
+  //               +------------------------------------------------+ 
+  //
+  //
+  //   during iterating:
+  //
+  //      ----->   +================================================+ 
+  //        ^      |    shared key bytes (1 byte < 128)             |
+  //        |      +------------------------------------------------+
+  //        |      |    non shared key bytes (1 byte < 128)         |
+  //        |      +------------------------------------------------+
+  //        |      |    value length (1 byte < 128)                 |
+  //        |      +------------------------------------------------+ 
+  //        |      |                                                |
+  //   prev entry  |                 non shared key                 |
+  //        |      |                                                |
+  //        |      +------------------------------------------------+ <---- value_ (size = value-len), value bytes will be 
+  //        |      |                                                |       skipped and parsing will be started at p
+  //        |      |                                                |
+  //        |      |                      value                     |
+  //        |      |                                                |
+  //        |      |                                                |
+  //        V      |                                                |
+  //      ----->   +================================================+ <---- p  
+  //        ^      |    shared key bytes (1 byte < 128)             |
+  //        |      +------------------------------------------------+
+  //        |      |    non shared key bytes (1 byte < 128)         |
+  //        |      +------------------------------------------------+
+  //        |      |    value length (1 byte < 128)                 |
+  //        |      +------------------------------------------------+    
+  //        |      |                                                |
+  //  curr entry   |                 non shared key                 |
+  //        |      |                                                |
+  //        |      +------------------------------------------------+
+  //        |      |                                                |
+  //        |      |                                                |
+  //        |      |                      value                     |
+  //        |      |                                                |
+  //        |      |                                                |
+  //        V      |                                                |
+  //     ------>   +------------------------------------------------+    
   Slice value_;
+
   Status status_;
 
   inline int Compare(const Slice& a, const Slice& b) const {
@@ -308,7 +378,13 @@ class Block::Iter : public Iterator {
   }
 
   bool ParseNextKey() {
+    // Yuanguo: skip "value bytes" of previous entry, return starting-offset of current entry, 
+    //   that is previous value_.data() + previous value_.size() - data_;
+    // NOTICE: if right after a seek (SeekToFirst, SeekToLast, Seek), previous value_.size() is 0 thus nothing is skipped;
+    // See my contents for Block::Iter::value_;
     current_ = NextEntryOffset();
+
+    // Yuanguo: `p` is the starting point of current entry;
     const char* p = data_ + current_;
     const char* limit = data_ + restarts_;  // Restarts come right after data
     if (p >= limit) {
@@ -325,7 +401,9 @@ class Block::Iter : public Iterator {
       CorruptionError();
       return false;
     } else {
+      // Yuanguo: reserve space for "sharted key bytes";
       key_.resize(shared);
+      // Yuanguo: append "no shared bytes" after the reserved space;
       key_.append(p, non_shared);
       value_ = Slice(p + non_shared, value_length);
       while (restart_index_ + 1 < num_restarts_ &&
