@@ -62,6 +62,9 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   return r;
 }
 
+// Yuanguo: 
+//    1. find a shorter `x` such that `*start < x < limit`, and set `*start = x`;
+//    2. if `x` does not exist, keep `*start` unchanged;
 void InternalKeyComparator::FindShortestSeparator(std::string* start,
                                                   const Slice& limit) const {
   // Attempt to shorten the user portion of the key
@@ -73,6 +76,17 @@ void InternalKeyComparator::FindShortestSeparator(std::string* start,
       user_comparator_->Compare(user_start, tmp) < 0) {
     // User key has become shorter physically, but larger logically.
     // Tack on the earliest possible number to the shortened user key.
+
+    // Yuanguo:  
+    //          +-------------------------------+--+--------------+
+    //      low |     tmp                       |01|  MAX-SEQ     | high
+    //          +-------------------------------+--+--------------+
+    //                        user_key         type(1B)  seq(7B) 
+    //
+    // Yuanguo: because internal keys are sorted by 
+    //              user_key ascending order;
+    //              type|seq desecending ordr;
+    // this is the earliest/smallest internal key for user_key=tmp
     PutFixed64(&tmp,
                PackSequenceAndType(kMaxSequenceNumber, kValueTypeForSeek));
     assert(this->Compare(*start, tmp) < 0);
