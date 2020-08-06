@@ -71,15 +71,15 @@ Slice BlockBuilder::Finish() {
 //Yuanguo:
 //
 //               data_  ----------->  +================================================+ <--------+
-//                                    |                     Entry                      |          |
-//                                    |                     Entry                      |          |
-//                                    |                     ......                     |          |
-//                                    |                     Entry                      |          |
+//                                    |  0,4,abcd           (abcd)                     |          |
+//                                    |  3,1,e              (abce)                     |          |
+//                                    |  4,2,xy             (abcexy)                   |          |
+//                                    |  1,3,mnp            (amnp)                     |          |
 //                                    +================================================+ <--------+-----+
-//                                    |                     Entry                      |          |     |
-//                                    |                     Entry                      |          |     |
-//                                    |                     ......                     |          |     |
-//                                    |                     Entry                      |          |     |
+//                                    |  0,3,hij            (hij)                      |          |     |
+//                                    |  2,1,k              (hik)                      |          |     |
+//                                    |  3,3,pqr            (hikpqr)                   |          |     |
+//                                    |  2,1,x              (hix)                      |          |     |
 //                                    +================================================+          |     |
 //                                    |                                                |          |     |
 //                                    |                                                |          |     |
@@ -90,10 +90,10 @@ Slice BlockBuilder::Finish() {
 //                                    |                                                |          |     |
 //                                    |                                                |          |     |
 //                                    +================================================+ <--------+-----+-----+
-//                                    |                     Entry                      |          |     |     |
-//                                    |                     Entry                      |          |     |     |
-//                                    |                     ......                     |          |     |     |
-//                                    |                     Entry                      |          |     |     |
+//                                    |  0,5,world          (world)                    |          |     |     |
+//                                    |  0,3,vow            (vow)                      |          |     |     |
+//                                    |  1,1,v              (vv)                       |          |     |     |
+//                                    |  2,3,xyz            (vvxyz)                    |          |     |     |
 // data_ + restart_offset_  ------->  +================================================+          |     |     |
 //                                    |              restart[0]                        | ---------+     |     |
 //                                    +------------------------------------------------+                |     |
@@ -118,7 +118,6 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
     //
     // See how much sharing to do with previous string
     // Yuanguo: calculate the shared prefix length between current key and the previous key;
-    //          for the 1st key in a block, it is 0;
     const size_t min_length = std::min(last_key_piece.size(), key.size());
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
       shared++;
@@ -129,6 +128,10 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
     restarts_.push_back(buffer_.size());
     counter_ = 0;
   }
+
+  // Yuanguo: for the 1st entry of every "restart", `shared` is 0:
+  //   1. it means no sharing across restarts; this is why it's called "restart";
+  //   2. it's important for iterator, see `Block::Iter`;
   const size_t non_shared = key.size() - shared;
 
   // Add "<shared><non_shared><value_size>" to buffer_

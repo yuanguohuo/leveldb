@@ -175,6 +175,18 @@ class Block::Iter : public Iterator {
   //     +------------------+-----------------------------------------+
   //     |   shared-bytes   |            non-shared-bytes             |
   //     +------------------+-----------------------------------------+
+  //
+  // Yuanguo: for the 1st entry of every "restart", "shared-bytes" is 0 (see function BlockBuilder::Add()), this is significant
+  //   for iterating:
+  //       a. when start iterating at the 1st entry of a "restart", `key_` is complete (because there is no shared bytes);
+  //       b. when `Next()` is called, `key_` is kept complete (containing shared-bytes and non-shared-bytes) by:
+  //                        key_.resize(shared);
+  //                        key_.append(p, non_shared);
+  //          see function `ParseNextKey` below;
+  //       c. we always seek to the 1st entry of a "restart", see Seek, SeekToFirst and SeekToFirst; so `key_` is always kept complete
+  //          while iterating; this is true even for `Prev()`, because it works like this:
+  //                        1. seek to a "restart" < `current_`;
+  //                        2. parse keys in the "restart" one by one;
   std::string key_;
 
   // Yuanguo: when iterating, `value_` points to the "value bytes" of current entry within the block; unlike `key_`, 
@@ -326,7 +338,9 @@ class Block::Iter : public Iterator {
     } while (ParseNextKey() && NextEntryOffset() < original);
   }
 
-  //Yuanguo: target is the non shared part of the key
+  //Yuanguo: `target` is the non shared part of the key.
+  //Yuanguo: NO!!!! this is not true: for the 1st entry of every "restart", "shared-bytes" is always 0, so `target`
+  //         is the whole key;
   void Seek(const Slice& target) override {
     // Binary search in restart array to find the last restart point
     // with a key < target
@@ -339,6 +353,10 @@ class Block::Iter : public Iterator {
       const char* key_ptr =
           DecodeEntry(data_ + region_offset, data_ + restarts_, &shared,
                       &non_shared, &value_length);
+
+      // Yuanguo: why shared must be 0?
+      //    1. for the 1st entry of every "restart", "shared-bytes" is always 0 (see function BlockBuilder::Add())
+      //    2. this is significant for iterating, see my comments for `Block::Iter::key_` above;
       if (key_ptr == nullptr || (shared != 0)) {
         CorruptionError();
         return;
@@ -412,16 +430,19 @@ class Block::Iter : public Iterator {
       CorruptionError();
       return false;
     } else {
-      // Yuanguo: reserve space for "sharted key bytes";
-      // Yuanguo:
-      //     Case-A: SeekToFirst(), keep calling `Nex()`, key_ will be kept complete (containing shared and
-      //             non-shared bytes), because:
-      //                 1. the 1st key in the block has no shared bytes, so key_ is complete at first;
-      //                 2. for subsequent calls to `Next()`, key_.resize(shared) keeps the shared parts;
-      //     Case-B: After Seek() or SeekToLast(), `key_` is incomplete, containing non-shared bytes only, when 
-      //             are the shared bytes filled in?
+      // Yuanguo: `key_` is kept complete while iterating, because:
+      //    1. for the 1st entry in every "restart", there's no shared-bytes, so the first key_ is complete;
+      //    2. subsequent key_ is kept complete by the following 2 lines: 
+      //           a. truncate the suffix, keeping the shared bytes only;
+      //           b. append the non shared bytes;
+      //    3. envn if for `Prev()`, key_ is kept complete, because it works by
+      //           a. seek to a "restart" < `current_`;
+      //           b. parse keys in the "restart" one by one;
+      //    also see my comments for `Block::Iter::key_` above;
+
+      // Yuanguo: truncate the suffix, keeping the shared bytes only;
       key_.resize(shared);
-      // Yuanguo: append "no shared bytes" after the reserved space;
+      // Yuanguo: append the non shared bytes;
       key_.append(p, non_shared);
       value_ = Slice(p + non_shared, value_length);
       // Yuanguo: update restart_index_ if we have finished a "restart";
