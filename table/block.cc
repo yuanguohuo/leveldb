@@ -17,38 +17,43 @@
 
 namespace leveldb {
 
-//Yuanguo:
+// Yuanguo: why split the entries into "restarts"? 
+//   one reason is to make `Block::Iter::Prev()` cheaper, see it below;
 //
-//               data_  ----------->  +================================================+
-//                                    |                                                |
-//                                    |                     Entry                      |  <----------------+
-//                                    |                                                |                   |
-//                                    +------------------------------------------------+                   |
-//                                    |                                                |                   |
-//                                    |                     Entry                      |  <----------------+---+
-//                                    |                                                |                   |   |
-//                                    +------------------------------------------------+                   |   |
-//                                    |                                                |                   |   |
-//                                    |                     .....                      |                   |   |
-//                                    |                                                |                   |   |
-//                                    +------------------------------------------------+                   |   |
-//                                    |                                                |                   |   |
-//                                    |                     Entry                      |  <----------------+---+---+
-//                                    |                                                |                   |   |   |
-//                                    +------------------------------------------------+                   |   |   |
-//                                    |                                                |                   |   |   |
-//                                    |                                                |                   |   |   |
-//                                    |                                                |                   |   |   |
-//                                    |                                                |                   |   |   |
-//                                    |                                                |                   |   |   |
-// data_ + restart_offset_  ------->  +------------------------------------------------+                   |   |   |
-//                                    |              restart[0]                        |  -----------------+   |   |
-//                                    +------------------------------------------------+                       |   |
-//                                    |              restart[1]                        |  ---------------------+   |
-//                                    +------------------------------------------------+                           |
-//                                    |              ......                            |                           |
-//                                    +------------------------------------------------+                           |
-//                                    |              restart[NumRestarts-1]            |  -------------------------+
+// Yuanguo:
+//
+//               data_  ----------->  +================================================+ <--------+
+//                                    |                     Entry                      |          |
+//                                    |                     Entry                      |          |
+//                                    |                     ......                     |          |
+//                                    |                     Entry                      |          |
+//                                    +================================================+ <--------+-----+
+//                                    |                     Entry                      |          |     |
+//                                    |                     Entry                      |          |     |
+//                                    |                     ......                     |          |     |
+//                                    |                     Entry                      |          |     |
+//                                    +================================================+          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    +================================================+ <--------+-----+-----+
+//                                    |                     Entry                      |          |     |     |
+//                                    |                     Entry                      |          |     |     |
+//                                    |                     ......                     |          |     |     |
+//                                    |                     Entry                      |          |     |     |
+// data_ + restart_offset_  ------->  +================================================+          |     |     |
+//                                    |              restart[0]                        | ---------+     |     |
+//                                    +------------------------------------------------+                |     |
+//                                    |              restart[1]                        | ---------------+     |
+//                                    +------------------------------------------------+                      |
+//                                    |              ......                            |                      |
+//                                    +------------------------------------------------+                      |
+//                                    |              restart[NumRestarts-1]            | ---------------------+
 //                                    +------------------------------------------------+
 //                                    |              NumRestarts (Fixed32)             |
 //         data_ + size_  --------->  +================================================+
@@ -81,7 +86,8 @@ Block::~Block() {
   }
 }
 
-//Yuanguo: Entry
+//Yuanguo: Entry (shared between what and what? between one key and previous key)
+//
 //   fast path:
 //               +------------------------------------------------+    <---- p before decode
 //               |    shared key bytes (1 byte < 128)             |
@@ -294,6 +300,10 @@ class Block::Iter : public Iterator {
     ParseNextKey();
   }
 
+  // Yuanguo: `Prev()` is more expensive than `Next()`: 
+  //      1. seek to a "restart" < `current_`;
+  //      2. parse keys in the "restart" one by one;
+  // by default, a "restart" contains 16 keys, thus 15 parses (at most) are needed;
   void Prev() override {
     assert(Valid());
 
@@ -301,6 +311,7 @@ class Block::Iter : public Iterator {
     const uint32_t original = current_;
     while (GetRestartPoint(restart_index_) >= original) {
       if (restart_index_ == 0) {
+        // Yuanguo: mark it as invalid;
         // No more entries
         current_ = restarts_;
         restart_index_ = num_restarts_;
@@ -402,10 +413,20 @@ class Block::Iter : public Iterator {
       return false;
     } else {
       // Yuanguo: reserve space for "sharted key bytes";
+      // Yuanguo:
+      //     Case-A: SeekToFirst(), keep calling `Nex()`, key_ will be kept complete (containing shared and
+      //             non-shared bytes), because:
+      //                 1. the 1st key in the block has no shared bytes, so key_ is complete at first;
+      //                 2. for subsequent calls to `Next()`, key_.resize(shared) keeps the shared parts;
+      //     Case-B: After Seek() or SeekToLast(), `key_` is incomplete, containing non-shared bytes only, when 
+      //             are the shared bytes filled in?
       key_.resize(shared);
       // Yuanguo: append "no shared bytes" after the reserved space;
       key_.append(p, non_shared);
       value_ = Slice(p + non_shared, value_length);
+      // Yuanguo: update restart_index_ if we have finished a "restart";
+      //    if current_ points to the starting entry of the N-th "restart", restart_index_ is not updated and still
+      //    points to (N-1)-th "restart"; it is in purpose: restart_index_ is used for `Prev()`;
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
         ++restart_index_;

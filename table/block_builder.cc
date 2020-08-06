@@ -68,6 +68,44 @@ Slice BlockBuilder::Finish() {
   return Slice(buffer_);
 }
 
+//Yuanguo:
+//
+//               data_  ----------->  +================================================+ <--------+
+//                                    |                     Entry                      |          |
+//                                    |                     Entry                      |          |
+//                                    |                     ......                     |          |
+//                                    |                     Entry                      |          |
+//                                    +================================================+ <--------+-----+
+//                                    |                     Entry                      |          |     |
+//                                    |                     Entry                      |          |     |
+//                                    |                     ......                     |          |     |
+//                                    |                     Entry                      |          |     |
+//                                    +================================================+          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    |                                                |          |     |
+//                                    +================================================+ <--------+-----+-----+
+//                                    |                     Entry                      |          |     |     |
+//                                    |                     Entry                      |          |     |     |
+//                                    |                     ......                     |          |     |     |
+//                                    |                     Entry                      |          |     |     |
+// data_ + restart_offset_  ------->  +================================================+          |     |     |
+//                                    |              restart[0]                        | ---------+     |     |
+//                                    +------------------------------------------------+                |     |
+//                                    |              restart[1]                        | ---------------+     |
+//                                    +------------------------------------------------+                      |
+//                                    |              ......                            |                      |
+//                                    +------------------------------------------------+                      |
+//                                    |              restart[NumRestarts-1]            | ---------------------+
+//                                    +------------------------------------------------+
+//                                    |              NumRestarts (Fixed32)             |
+//         data_ + size_  --------->  +================================================+
+//
 void BlockBuilder::Add(const Slice& key, const Slice& value) {
   Slice last_key_piece(last_key_);
   assert(!finished_);
@@ -76,12 +114,17 @@ void BlockBuilder::Add(const Slice& key, const Slice& value) {
          || options_->comparator->Compare(key, last_key_piece) > 0);
   size_t shared = 0;
   if (counter_ < options_->block_restart_interval) {
+    // Yuanguo: current "restart" is not full;
+    //
     // See how much sharing to do with previous string
+    // Yuanguo: calculate the shared prefix length between current key and the previous key;
+    //          for the 1st key in a block, it is 0;
     const size_t min_length = std::min(last_key_piece.size(), key.size());
     while ((shared < min_length) && (last_key_piece[shared] == key[shared])) {
       shared++;
     }
   } else {
+    // Yuanguo: current "restart" is full, close it and open a new one;
     // Restart compression
     restarts_.push_back(buffer_.size());
     counter_ = 0;
