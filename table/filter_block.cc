@@ -104,7 +104,7 @@ void FilterBlockBuilder::GenerateFilter() {
 //             |base_lg_ (1B)                               |
 //             +--------------------------------------------+
 //
-//             block-X => filter-Y  if  block-X-offset / base_lg_ == Y
+//             block-X => filter-Y  if  block-X-offset >> base_lg_ == Y
 //
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
                                      const Slice& contents)
