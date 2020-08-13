@@ -18,6 +18,13 @@ static const size_t kFilterBase = 1 << kFilterBaseLg;
 FilterBlockBuilder::FilterBlockBuilder(const FilterPolicy* policy)
     : policy_(policy) {}
 
+// Yuanguo: multiple blocks may be merged and share a single filter; for example,
+//          block_offset_0 / kFilterBase = 0
+//          block_offset_1 / kFilterBase = 0
+//          block_offset_2 / kFilterBase = 0
+//          block_offset_3 / kFilterBase = 1
+// then block 0 to 2 share filter-0; when block_offset_3 is encountered, `GenerateFilter` is
+// called and filter-0 is generated;
 void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
   uint64_t filter_index = (block_offset / kFilterBase);
   assert(filter_index >= filter_offsets_.size());
@@ -76,31 +83,29 @@ void FilterBlockBuilder::GenerateFilter() {
 
 //Yuanguo: the filter block:
 //  data_ ---> +--------------------------------------------+
-//             |filter bits of block 0                      |
-//             |                                            |
+//             |filter-0: for block 0-2                     |
 //             +--------------------------------------------+
-//             |filter bits of block 1                      |
-//             |                                            |
-//             |                                            |
+//             |filter-1: for block 3                       |
 //             +--------------------------------------------+
-//             |filter bits of block 2                      |
+//             |filter-2: for block 4-9                     |
 //             +--------------------------------------------+
-//                                ......
+//             |                  ......                    |
 //             +--------------------------------------------+
-//             |filter bits of block N                      |
-//             |                                            |
+//             |filter-N: for block M-P                     |
 // offset_ --> +--------------------------------------------+
-//             |  offset of block-0 filter bits (4B)        |
-//             |  offset of block-1 filter bits (4B)        |
-//             |  offset of block-2 filter bits (4B)        |
-//             |               ......                       |
-//             |  offset of block-N filter bits (4B)        |
+//             |  offset of filter-0 (4B)                   |
+//             |  offset of filter-1 (4B)                   |
+//             |  offset of filter-2 (4B)                   |
+//             |  ......                                    |
+//             |  offset of filter-N (4B)                   |
 //             +--------------------------------------------+
 //             |last_word: gap between data_ and offset_(4B)|
 //             +--------------------------------------------+
 //             |base_lg_ (1B)                               |
 //             +--------------------------------------------+
-
+//
+//             block-X => filter-Y  if  block-X-offset / base_lg_ == Y
+//
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
                                      const Slice& contents)
     : policy_(policy), data_(nullptr), offset_(nullptr), num_(0), base_lg_(0) {

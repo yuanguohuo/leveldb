@@ -61,7 +61,9 @@ class TwoLevelIterator : public Iterator {
   void* arg_;
   const ReadOptions options_;
   Status status_;
+  // Yuanguo: upper level iterator;
   IteratorWrapper index_iter_;
+  // Yuanguo: lower level iterator;
   IteratorWrapper data_iter_;  // May be nullptr
   // If data_iter_ is non-null, then "data_block_handle_" holds the
   // "index_value" passed to block_function_ to create the data_iter_.

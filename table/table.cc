@@ -76,34 +76,6 @@ struct Table::Rep {
 //   Footer    |   metaindex handle (offset,size)           | -------------+    |
 //             |   index handle (offset,size)               | ------------------+
 //             +============================================+
-
-//Yuanguo: the filter block:
-//  data_ ---> +--------------------------------------------+
-//             |filter bits of block 0                      |
-//             |                                            |
-//             +--------------------------------------------+
-//             |filter bits of block 1                      |
-//             |                                            |
-//             |                                            |
-//             +--------------------------------------------+
-//             |filter bits of block 2                      |
-//             +--------------------------------------------+
-//                                ......
-//             +--------------------------------------------+
-//             |filter bits of block N                      |
-//             |                                            |
-// offset_ --> +--------------------------------------------+
-//             |  offset of block-0 filter bits (4B)        |
-//             |  offset of block-1 filter bits (4B)        |
-//             |  offset of block-2 filter bits (4B)        |
-//             |               ......                       |
-//             |  offset of block-N filter bits (4B)        |
-//             +--------------------------------------------+
-//             |last_word: gap between data_ and offset_(4B)|
-//             +--------------------------------------------+
-//             |base_lg_ (1B)                               |
-//             +--------------------------------------------+
-
 Status Table::Open(const Options& options, RandomAccessFile* file,
                    uint64_t size, Table** table) {
   *table = nullptr;
@@ -219,6 +191,8 @@ static void ReleaseBlock(void* arg, void* h) {
 
 // Convert an index iterator value (i.e., an encoded BlockHandle)
 // into an iterator over the contents of the corresponding block.
+// Yuanguo: given table (arg) and block handle (index_value), return the iterator
+//   of the block;
 Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
                              const Slice& index_value) {
   Table* table = reinterpret_cast<Table*>(arg);
@@ -235,6 +209,7 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   if (s.ok()) {
     BlockContents contents;
     if (block_cache != nullptr) {
+      // Yuanguo: block_cache_id = table_cache_id + block_offset
       char cache_key_buffer[16];
       EncodeFixed64(cache_key_buffer, table->rep_->cache_id);
       EncodeFixed64(cache_key_buffer + 8, handle.offset());
@@ -264,8 +239,11 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   if (block != nullptr) {
     iter = block->NewIterator(table->rep_->options.comparator);
     if (cache_handle == nullptr) {
+      // Yuanguo: there is no block cache, so delete block when iterator is destroyed;
       iter->RegisterCleanup(&DeleteBlock, block, nullptr);
     } else {
+      // Yuanguo: there is block cache, release block (release the ref held by the iterator) when 
+      //   iterator is destroyed;
       iter->RegisterCleanup(&ReleaseBlock, block_cache, cache_handle);
     }
   } else {
@@ -274,6 +252,11 @@ Iterator* Table::BlockReader(void* arg, const ReadOptions& options,
   return iter;
 }
 
+// Yuanguo: return an iterator for this table, which is a two level iterator:
+//   upper level: iterate over block handles in this table; each of the block handles is used to create the lower level
+//                iterator;
+//   lower level: iterate over a block (lower level iterator is created by Table::BlockReader, given this table and a
+//                block handle);
 Iterator* Table::NewIterator(const ReadOptions& options) const {
   return NewTwoLevelIterator(
       rep_->index_block->NewIterator(rep_->options.comparator),
@@ -284,16 +267,20 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
                           void (*handle_result)(void*, const Slice&,
                                                 const Slice&)) {
   Status s;
+  // Yuanguo: seek by index iterator; if valid, index iterator points to the potential block;
   Iterator* iiter = rep_->index_block->NewIterator(rep_->options.comparator);
   iiter->Seek(k);
   if (iiter->Valid()) {
+    // Yuanguo: the block handle for the potential block;
     Slice handle_value = iiter->value();
     FilterBlockReader* filter = rep_->filter;
     BlockHandle handle;
+    // Yuanguo: decode the block handle and test `k` by filter;
     if (filter != nullptr && handle.DecodeFrom(&handle_value).ok() &&
         !filter->KeyMayMatch(handle.offset(), k)) {
       // Not found
     } else {
+      // Yuanguo: seek by block iterator; if valid, invoke callback on 'current' kv-pair;
       Iterator* block_iter = BlockReader(this, options, iiter->value());
       block_iter->Seek(k);
       if (block_iter->Valid()) {
@@ -311,6 +298,7 @@ Status Table::InternalGet(const ReadOptions& options, const Slice& k, void* arg,
 }
 
 uint64_t Table::ApproximateOffsetOf(const Slice& key) const {
+  // Yuanguo: seek by index iterator; if valid, index iterator points to the potential block;
   Iterator* index_iter =
       rep_->index_block->NewIterator(rep_->options.comparator);
   index_iter->Seek(key);
@@ -320,6 +308,7 @@ uint64_t Table::ApproximateOffsetOf(const Slice& key) const {
     Slice input = index_iter->value();
     Status s = handle.DecodeFrom(&input);
     if (s.ok()) {
+      // Yuanguo: return the offset of the block containing the given key;
       result = handle.offset();
     } else {
       // Strange: we can't decode the block handle in the index block.
