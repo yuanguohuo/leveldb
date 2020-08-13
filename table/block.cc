@@ -355,8 +355,8 @@ class Block::Iter : public Iterator {
                       &non_shared, &value_length);
 
       // Yuanguo: why shared must be 0?
-      //    1. for the 1st entry of every "restart", "shared-bytes" is always 0 (see function BlockBuilder::Add())
-      //    2. this is significant for iterating, see my comments for `Block::Iter::key_` above;
+      //   for the 1st entry of every "restart", "shared-bytes" is always 0 (see function BlockBuilder::Add()); this is 
+      //   significant for iterating, see my comments for `Block::Iter::key_` above;
       if (key_ptr == nullptr || (shared != 0)) {
         CorruptionError();
         return;

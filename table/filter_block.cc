@@ -74,6 +74,33 @@ void FilterBlockBuilder::GenerateFilter() {
   start_.clear();
 }
 
+//Yuanguo: the filter block:
+//  data_ ---> +--------------------------------------------+
+//             |filter bits of block 0                      |
+//             |                                            |
+//             +--------------------------------------------+
+//             |filter bits of block 1                      |
+//             |                                            |
+//             |                                            |
+//             +--------------------------------------------+
+//             |filter bits of block 2                      |
+//             +--------------------------------------------+
+//                                ......
+//             +--------------------------------------------+
+//             |filter bits of block N                      |
+//             |                                            |
+// offset_ --> +--------------------------------------------+
+//             |  offset of block-0 filter bits (4B)        |
+//             |  offset of block-1 filter bits (4B)        |
+//             |  offset of block-2 filter bits (4B)        |
+//             |               ......                       |
+//             |  offset of block-N filter bits (4B)        |
+//             +--------------------------------------------+
+//             |last_word: gap between data_ and offset_(4B)|
+//             +--------------------------------------------+
+//             |base_lg_ (1B)                               |
+//             +--------------------------------------------+
+
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
                                      const Slice& contents)
     : policy_(policy), data_(nullptr), offset_(nullptr), num_(0), base_lg_(0) {
@@ -88,8 +115,13 @@ FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
 }
 
 bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
+  // Yuanguo: the index of the block that `key` resides in
   uint64_t index = block_offset >> base_lg_;
   if (index < num_) {
+    // Yuanguo: 
+    //    start: the offset (inclusive) of filter bits for current block;
+    //    limit: the offset (inclusive) of filter bits for the next block; thus
+    //           it is the end position (exclusive) for current block;
     uint32_t start = DecodeFixed32(offset_ + index * 4);
     uint32_t limit = DecodeFixed32(offset_ + index * 4 + 4);
     if (start <= limit && limit <= static_cast<size_t>(offset_ - data_)) {
