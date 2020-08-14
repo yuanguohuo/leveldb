@@ -18,16 +18,21 @@ static const size_t kFilterBase = 1 << kFilterBaseLg;
 FilterBlockBuilder::FilterBlockBuilder(const FilterPolicy* policy)
     : policy_(policy) {}
 
-// Yuanguo: multiple blocks may be merged and share a single filter; for example,
+// Yuanguo: multiple data blocks may be merged and share a single filter; for example,
 //          block_offset_0 / kFilterBase = 0
 //          block_offset_1 / kFilterBase = 0
 //          block_offset_2 / kFilterBase = 0
 //          block_offset_3 / kFilterBase = 1
-// then block 0 to 2 share filter-0; when block_offset_3 is encountered, `GenerateFilter` is
+// then data block 0 to 2 share filter-0; when block_offset_3 is encountered, `GenerateFilter` is
 // called and filter-0 is generated;
 void FilterBlockBuilder::StartBlock(uint64_t block_offset) {
+  // Yuanguo: which 2KB-boundary `block_offset` is in?
   uint64_t filter_index = (block_offset / kFilterBase);
   assert(filter_index >= filter_offsets_.size());
+  // Yuanguo: in a new 2KB-boundary, so new filter should be created;
+  // Yuanguo: the prev data block is too big, 10KB for example, then 
+  //          5 2KB-boundaries are passed, thus fill it with empty 
+  //          filters;
   while (filter_index > filter_offsets_.size()) {
     GenerateFilter();
   }
@@ -82,22 +87,44 @@ void FilterBlockBuilder::GenerateFilter() {
 }
 
 //Yuanguo: the filter block:
+//
+//   DataBlock-0 offset = 0;
+//   DataBlock-1 offset = 0.5K;
+//   DataBlock-2 offset = 1.2K;  //very large, till 13K-1;
+//   DataBlock-3 offset = 13K;
+//   DataBlock-4 offset = 14.8K;
+//   DataBlock-5 offset = 15.1K;
+//
+//   1. 0/2K = 0.5K/2K = 1.2K/2K = 0; so, DataBlock 0,1,2 share the filter-0;
+//   2. Since DataBlock-3 starts at 13K, then 5 empty filters are filled in;
+//
+//   Why fill in the empty filters? 
+//   To make `offset_` an array, which can be looked up by index: Suppose we know a DataBlock whose offset is 13K,
+//   and we want to get the its filter. Then we can: 
+//       index = 13K/2K = 6;     //`index = block_offset >> base_lg_` in FilterBlockReader::KeyMayMatch();
+//       start = offset_[index]; //`start = DecodeFixed32(offset_ + index * 4)` in FilterBlockReader::KeyMayMatch();
+//
 //  data_ ---> +--------------------------------------------+
-//             |filter-0: for block 0-2                     |
+//             |filter-0: for block 0,1,2                   |
 //             +--------------------------------------------+
-//             |filter-1: for block 3                       |
+//             |filter-6: for block 3                       |
 //             +--------------------------------------------+
-//             |filter-2: for block 4-9                     |
+//             |filter-7: for block 4,5                     |
 //             +--------------------------------------------+
 //             |                  ......                    |
 //             +--------------------------------------------+
-//             |filter-N: for block M-P                     |
+//             |filter-N: for block M,M+1,...               |
 // offset_ --> +--------------------------------------------+
-//             |  offset of filter-0 (4B)                   |
-//             |  offset of filter-1 (4B)                   |
-//             |  offset of filter-2 (4B)                   |
-//             |  ......                                    |
-//             |  offset of filter-N (4B)                   |
+//             |offset_[0]  filter-0 offset (4B)            |
+//             |offset_[1]  empty (4B)                      |
+//             |offset_[2]  empty (4B)                      |
+//             |offset_[3]  empty (4B)                      |
+//             |offset_[4]  empty (4B)                      |
+//             |offset_[5]  empty (4B)                      |
+//             |offset_[6]  filter-6 offset (4B)            |
+//             |offset_[7]  filter-7 offset (4B)            |
+//             |            ......                          |
+//             |offset_[N]  filter-N offset (4B)            |
 //             +--------------------------------------------+
 //             |last_word: gap between data_ and offset_(4B)|
 //             +--------------------------------------------+
@@ -120,13 +147,12 @@ FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
 }
 
 bool FilterBlockReader::KeyMayMatch(uint64_t block_offset, const Slice& key) {
-  // Yuanguo: the index of the block that `key` resides in
+  // Yuanguo: index of the filter;
   uint64_t index = block_offset >> base_lg_;
   if (index < num_) {
     // Yuanguo: 
-    //    start: the offset (inclusive) of filter bits for current block;
-    //    limit: the offset (inclusive) of filter bits for the next block; thus
-    //           it is the end position (exclusive) for current block;
+    //    start: offset of filter data;
+    //    limit: offset of next filter data, also the end position of current filter data;
     uint32_t start = DecodeFixed32(offset_ + index * 4);
     uint32_t limit = DecodeFixed32(offset_ + index * 4 + 4);
     if (start <= limit && limit <= static_cast<size_t>(offset_ - data_)) {
