@@ -62,9 +62,9 @@ int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   return r;
 }
 
-// Yuanguo: 
-//    1. find a shorter `x` such that `*start < x < limit`, and set `*start = x`;
-//    2. if `x` does not exist, keep `*start` unchanged;
+// Yuanguo: return a shorter string `x` such that `*start <= x < limit`; thus
+//   it is a valid implementation to return `*start` (keep it unchanged);
+//   the implementation depends on user_comparator_->FindShortestSeparator;
 void InternalKeyComparator::FindShortestSeparator(std::string* start,
                                                   const Slice& limit) const {
   // Attempt to shorten the user portion of the key

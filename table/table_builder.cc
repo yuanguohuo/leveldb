@@ -100,20 +100,24 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
   }
 
   // Yuanguo: 
-  //   1. r->pending_index_entry is false initially;
-  //   2. when keys are kept adding to `this` TableBuilder, estimated_block_size >= r->options.block_size,
-  //      then a block is full, and `Flush()` is invoked, see below;
+  //   1. r->pending_index_entry = false initially;
+  //   2. when keys are added to `this` TableBuilder and make estimated_block_size >= r->options.block_size,
+  //      then a block is full, and `Flush()` is invoked;
   //   3. in `Flush()` 
-  //         a. r->pending_index_entry is set to true;
+  //         a. r->pending_index_entry = true;
   //         b. flush the full block into file, and save its handle (offset and size) in r->pending_handle;
   //         c. clear r->data_block;
-  //   4. when one more key is added, we get here with r->pending_index_entry = true; which means we need to
-  //      build index for previous full block just flushed;
+  //   4. when one more key is added, we get here with r->pending_index_entry == true; which means we need to
+  //      build index for the previous full block just flushed;
   if (r->pending_index_entry) {
     assert(r->data_block.empty());
+    // Yuanguo: a simple (but valid) implementation of FindShortestSeparator may keep `r->last_key` unchanged,
+    // see InternalKeyComparator::FindShortestSeparator --> 
+    //        user_comparator_->FindShortestSeparator
     r->options.comparator->FindShortestSeparator(&r->last_key, key);
     std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);
+    // Yuanguo: the key of the block index is the largest key?
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
   }
