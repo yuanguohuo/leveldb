@@ -84,6 +84,13 @@ Version::~Version() {
   }
 }
 
+// Yuanguo: the same logic as seeking a block in a table: the key of the block index is 
+//   the largest key of that block, just like `f->largest` here;
+//   the returned block is the first block whose largest key >= "target"; so "target"
+//   may only exist in this block: 
+//       previous blocks  : largest key < "target";
+//       following blocks : first key > "target";
+//   here, `FindFile` returns the first file whose largest key >= "target";
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files, const Slice& key) {
   uint32_t left = 0;

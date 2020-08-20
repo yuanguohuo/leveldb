@@ -97,7 +97,7 @@ class Version {
   //     say they are f1, f2, ... (multiple in level-0 and/or in multiple levels), f1
   //     is the newest; (multiple files overlapping with one key ==> compactable)
   // then, call "UpdateStats" on f1, that's to
-  //     f1->allowed_seeks--; and if down to 0, return true, meaning that a compaction may need to
+  //     f1->allowed_seeks--; and if down to 0, return true, meaning that a compaction needs to
   //     be triggered, thus set compactable (this->file_to_compact_ = f1; this->file_to_compact_level_ = level of f1);
   bool RecordReadSample(Slice key);
 

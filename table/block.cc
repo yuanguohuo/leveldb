@@ -340,7 +340,7 @@ class Block::Iter : public Iterator {
 
   //Yuanguo: `target` is the non shared part of the key.
   //Yuanguo: NO!!!! this is not true: for the 1st entry of every "restart", "shared-bytes" is always 0, so `target`
-  //         is the whole key;
+  //         is the complete key;
   void Seek(const Slice& target) override {
     // Binary search in restart array to find the last restart point
     // with a key < target
@@ -374,6 +374,8 @@ class Block::Iter : public Iterator {
     }
 
     // Linear search (within restart block) for first key >= target
+    // Yuanguo: within? it's possible that "target" is in next restart (the first key of next restart); see the above line:
+    //      right = mid - 1; 
     SeekToRestartPoint(left);
     while (true) {
       if (!ParseNextKey()) {
