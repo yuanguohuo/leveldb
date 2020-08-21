@@ -133,6 +133,7 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
   const Comparator* ucmp = icmp.user_comparator();
   if (!disjoint_sorted_files) {
     // Need to check against all files
+    // Yuanguo: for levels other than level-0;
     for (size_t i = 0; i < files.size(); i++) {
       const FileMetaData* f = files[i];
       if (AfterFile(ucmp, smallest_user_key, f) ||
@@ -146,11 +147,14 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
   }
 
   // Binary search over file list
+  // Yuanguo: for level-0;
   uint32_t index = 0;
   if (smallest_user_key != nullptr) {
     // Find the earliest possible internal key for smallest_user_key
     InternalKey small_key(*smallest_user_key, kMaxSequenceNumber,
                           kValueTypeForSeek);
+    // Yuanguo: the first file whose largest key >= small_key; the files
+    //   before it are irrelevant, because their largest key < small_key;
     index = FindFile(icmp, files, small_key.Encode());
   }
 
@@ -159,6 +163,9 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
     return false;
   }
 
+  // Yuanguo: files[index] is the first file whose largest key >= small_key;
+  //   if largest_user_key is befor it (largest_user_key < its smallest key), no overlap;
+  //   else, overlap;
   return !BeforeFile(ucmp, largest_user_key, files[index]);
 }
 
@@ -193,10 +200,12 @@ class Version::LevelFileNumIterator : public Iterator {
       index_--;
     }
   }
+  // Yuanguo: key is the largest key of current file;
   Slice key() const override {
     assert(Valid());
     return (*flist_)[index_]->largest.Encode();
   }
+  // Yuanguo: value is "number .. file_size" of current file;
   Slice value() const override {
     assert(Valid());
     EncodeFixed64(value_buf_, (*flist_)[index_]->number);
@@ -214,6 +223,8 @@ class Version::LevelFileNumIterator : public Iterator {
   mutable char value_buf_[16];
 };
 
+// Yuanguo: get the iterator of the "Table object" corresponding to the file;
+//   it's the return value of "Table::NewIterator()" in table/table.cc;
 static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
                                  const Slice& file_value) {
   TableCache* cache = reinterpret_cast<TableCache*>(arg);
@@ -226,6 +237,11 @@ static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
   }
 }
 
+// Yuanguo: return a TwoLevelIterator, it is the iterator of "files in a given level";
+//   upper level: LevelFileNumIterator, which yields file (largest_key => number..file_size) one by one;
+//   lower level: table iterator created by "GetFileIterator()", which yields kv pairs in the table/file;
+// Notice, lower level (the table iterator) is also a TwoLevelIterator, see "Table::NewIterator()" in 
+// table/table.cc;
 Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
                                             int level) const {
   return NewTwoLevelIterator(
@@ -233,6 +249,7 @@ Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
       vset_->table_cache_, options);
 }
 
+// Yuanguo: [level0_file0, level0_file1, ..., level0_fileN, level1, level2, ...]
 void Version::AddIterators(const ReadOptions& options,
                            std::vector<Iterator*>* iters) {
   // Merge all level zero files together since they may overlap
@@ -267,6 +284,8 @@ struct Saver {
   std::string* value;
 };
 }  // namespace
+
+// Yuanguo: *arg->value = v;
 static void SaveValue(void* arg, const Slice& ikey, const Slice& v) {
   Saver* s = reinterpret_cast<Saver*>(arg);
   ParsedInternalKey parsed_key;
