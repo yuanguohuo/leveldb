@@ -163,12 +163,6 @@ class Version {
   // false, makes no more calls.
   //
   // REQUIRES: user portion of internal_key == user_key.
-  // 
-  // Yuanguo:
-  //    for each level "lvl" in 0, 1, ... 
-  //        for each file "fl" in the level "lvl" (file number high to low)
-  //            if user_key in [fl.smallest, fl.largest], call func(arg, lvl, fl)
-  //    stop when func() returns false;
   void ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                           bool (*func)(void*, int, FileMetaData*));
 

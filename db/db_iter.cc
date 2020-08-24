@@ -119,6 +119,11 @@ class DBIter : public Iterator {
   size_t bytes_until_read_sampling_;
 };
 
+// Yuanguo: bytes_until_read_sampling_ = 1.5MB initially,
+//    whenever `bytes_read` amount of data is read, bytes_until_read_sampling_ -= bytes_read;
+//    if bytes_until_read_sampling_ falls low enough, 
+//        bytes_until_read_sampling_ is recharged, e.g. bytes_until_read_sampling_ += 1.2MB
+//        RecordReadSample is called;
 inline bool DBIter::ParseKey(ParsedInternalKey* ikey) {
   Slice k = iter_->key();
 

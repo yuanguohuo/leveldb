@@ -285,7 +285,7 @@ struct Saver {
 };
 }  // namespace
 
-// Yuanguo: *arg->value = v;
+// Yuanguo: *arg->value = v if ikey matches arg->user_key;
 static void SaveValue(void* arg, const Slice& ikey, const Slice& v) {
   Saver* s = reinterpret_cast<Saver*>(arg);
   ParsedInternalKey parsed_key;
@@ -305,6 +305,28 @@ static bool NewestFirst(FileMetaData* a, FileMetaData* b) {
   return a->number > b->number;
 }
 
+// Yuanguo: 
+//   1. for each file `f` in level-0: if `f` overlaps with user_key, call `func` on it;
+//   2. for level 1, 2, ..., find the find `f` overlapping with internal_key, call `func` on it;
+// the process stops once `func` returns false;
+//
+// Version::Get,
+//    user_key/internal_key: the key to get; they are used to find potential files (overlapping files);
+//    func: a Match function; 
+//            if func(potential_file) return false, meaning target key is FOUND, ForEachOverlapping will return;
+//            else, func(potential_file) return true, meaning NOT FOUND, ForEachOverlapping will keep trying;
+// it goes like this:
+//   1. find the potential files (multiple) in level-0, sort them by `NewestFirst` (the larger number, the newest),
+//      and for each of them, call func(potential_file), until FOUND (func returns false) in some file;
+//   2. if not found in level-0, keep trying in level 1, 2, ..., for each level, find the potential file (only one),
+//      and call func(potential_file), until FOUND in some level;
+//
+// Version::RecordReadSample
+//    user_key/internal_key: the key to sample; they are used to find overlapping files;
+//    func: a Match function;
+//            count the overlapping files (matches++);
+//            if matches >= 2, return false (stop counting), meaning >=2 files overlapping with the key, compaction
+//            may be needed;
 void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
                                  bool (*func)(void*, int, FileMetaData*)) {
   const Comparator* ucmp = vset_->icmp_.user_comparator();
@@ -365,6 +387,7 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
     Status s;
     bool found;
 
+    // Yuanguo: if file `f` contains ikey, returns false; else return true (keep searching);
     static bool Match(void* arg, int level, FileMetaData* f) {
       State* state = reinterpret_cast<State*>(arg);
 
@@ -439,6 +462,8 @@ bool Version::UpdateStats(const GetStats& stats) {
   return false;
 }
 
+// Yuanguo: when a number of bytes (randomly picked, e.g. 1.5MB) has been read, this function will 
+//   be called once; see DBIter::ParseKey in db/db_iter.cc;
 bool Version::RecordReadSample(Slice internal_key) {
   ParsedInternalKey ikey;
   if (!ParseInternalKey(internal_key, &ikey)) {
