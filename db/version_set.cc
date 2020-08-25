@@ -534,7 +534,7 @@ bool Version::OverlapInLevel(int level, const Slice* smallest_user_key,
 int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                         const Slice& largest_user_key) {
   int level = 0;
-  //Yuanguo: if overlap with Level-0, then reutrn 0;
+  //Yuanguo: if overlap with Level-0, then reutrn 0; else ...
   if (!OverlapInLevel(0, &smallest_user_key, &largest_user_key)) {
     // Push to next level if there is no overlap in next level,
     // and the #bytes overlapping in the level after that are limited.
@@ -608,11 +608,15 @@ void Version::GetOverlappingInputs(int level, const InternalKey* begin,
       //
       //
       // a. file-1 and file-2 are skipped at first;
-      // b. but, when file-3 is encountered `user_begin` is set to `f3s` (file-3-start), and restart 
-      //    search, so file-1 will be included and `user_begin` will be set to `f1s` and restart search again;
-      // c. when file-4 is encountered, `user_end` is set to `f4l` (file-4-limit) and restart search,
+      // b. but, when file-3 is encountered `user_begin` is set to `f3s` (file-3-start), and search is restarted,
+      //    so file-1 will be included and `user_begin` will be set to `f1s` and search is restarted again;
+      // c. when file-4 is encountered, `user_end` is set to `f4l` (file-4-limit) and search is restarted,
       //    as a result, file-2 will be included and `user_end` will be set to `f2l`;
       // d. file-5 will never be included;
+      //
+      // why expand the range like that? 
+      // I guess, for compaction, it would be incorrect if we only compact file-3 and file-4 to level-1, leaving 
+      // file-1 and file-2 in level-0: file-3 or file-4 contains newer versions of keys than file-1 and file-2;
 
       if (level == 0) {
         // Level-0 files may overlap each other.  So check if the newly
@@ -1021,6 +1025,7 @@ Status VersionSet::Recover(bool* save_manifest) {
   if (current.empty() || current[current.size() - 1] != '\n') {
     return Status::Corruption("CURRENT file does not end with newline");
   }
+  // Yuanguo: remove the trailing '\n';
   current.resize(current.size() - 1);
 
   std::string dscname = dbname_ + "/" + current;
