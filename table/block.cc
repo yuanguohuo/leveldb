@@ -70,11 +70,15 @@ Block::Block(const BlockContents& contents)
   if (size_ < sizeof(uint32_t)) {
     size_ = 0;  // Error marker
   } else {
+    //Yuanguo: 假如前面没有Entry，Block的全部空间就是 restart数组+数组的大小(NumRestarts)，这样最多
+    //  有max_restarts_allowed个restarts。
+    //  显然NumRestarts不能大于它；否则，就是data corrupted了；
     size_t max_restarts_allowed = (size_ - sizeof(uint32_t)) / sizeof(uint32_t);
     if (NumRestarts() > max_restarts_allowed) {
       // The size is too small for NumRestarts()
       size_ = 0;
     } else {
+      //Yuanguo: 多减一个1，代表NumRestarts占用的一个uint32_t;
       restart_offset_ = size_ - (1 + NumRestarts()) * sizeof(uint32_t);
     }
   }
@@ -141,10 +145,14 @@ Block::~Block() {
 static inline const char* DecodeEntry(const char* p, const char* limit,
                                       uint32_t* shared, uint32_t* non_shared,
                                       uint32_t* value_length) {
+  //Yuanguo: p到limit之间有：shard key bytes (至少1B)，non_shared key bytes (至少1B)，value length (至少1B)，
+  //  所以 limit - p < 3表示数据是invalid，返回nullptr;
   if (limit - p < 3) return nullptr;
   *shared = reinterpret_cast<const uint8_t*>(p)[0];
   *non_shared = reinterpret_cast<const uint8_t*>(p)[1];
   *value_length = reinterpret_cast<const uint8_t*>(p)[2];
+  //Yuanguo: 最高位全部为0，表示都是 shard key bytes, non_shared key bytes和value length都是1B；
+  //  否则，它们就都是4B(32bit)的；
   if ((*shared | *non_shared | *value_length) < 128) {
     // Fast path: all three values are encoded in one byte each
     p += 3;
@@ -183,19 +191,34 @@ class Block::Iter : public Iterator {
   //                        key_.resize(shared);
   //                        key_.append(p, non_shared);
   //          see function `ParseNextKey` below;
-  //       c. we always seek to the 1st entry of a "restart", see Seek, SeekToFirst and SeekToFirst; so `key_` is always kept complete
+  //       c. we always seek to the 1st entry of a "restart", see Seek, SeekToFirst and SeekToLast; so `key_` is always kept complete
   //          while iterating; this is true even for `Prev()`, because it works like this:
   //                        1. seek to a "restart" < `current_`;
   //                        2. parse keys in the "restart" one by one;
   std::string key_;
 
   // Yuanguo: when iterating, `value_` points to the "value bytes" of current entry within the block; unlike `key_`, 
-  //   it doesn't store, by just point to (see class Slice);
+  //   it doesn't store, but just points to the bytes (see class Slice);
   //
   // NOTICE: right after SeekToRestartPoint, `value_` doesn't point to the "value bytes", but point to
   //   the start-point of current entry with size = 0; then ParseNextKey() is called, which makes `value_` right!
   //   Plus, ParseNextKey() will try to skip "value bytes" first, and then start parsing; right after SeekToRestartPoint, nothing is skipped 
   //   because value size = 0; And when Next() is called, it skips "value bytes of prev entry" and parses current;
+  //
+  //Yuanguo: SeekToRestartPoint之后：
+  //  - key是空的；
+  //  - value_指向本Restart的开始处，且size=0；
+  //这是为了满足循环不变式：
+  //   当前Iter指向Entry-P，调用ParseNextKey()去Parse Entry-P+1之前，key_和value_总能满足：
+  //       1. key_是Entry-P的完整的key；
+  //       2. value_指向Entry-P的value起始地址，且长度正确；
+  //   只有满足这2个条件(循环不变式)，ParseNextKey()才能正确地解析Entry-P+1。迭代的过程中，一直满足。见ParseNextKey()的实现。
+  //   SeekToRestartPoint之后，是满足这2个条件的，只不过Entry-P是一个空Entry (key_和value_都是空的)。Iter指向这个空的Entry-P的状态，
+  //   外部是不可见的，因为SeekToRestartPoint()之后，总是立即ParseNextKey()，见Seek, SeekToFirst, SeekToLast，都是seek之后，立即ParseNextKey()。
+  //   所以，Iter的user，构造一个Iter，调用Seek/SeekToFirst/SeekToLast之一之后，Iter就指向了一个合法的Entry(如果存在)。
+  //
+  //   换言之，SeekToRestartPoint之后，是一个"内部的"、"临时的"状态，它指向一个空的、虚拟的、不存在的Entry，但满足循环不变式。然后立即调用
+  //   ParseNextKey()，是Iter进入一个外部可见的状态(指向Restart的第一个Entry)。
   //
   //   right after SeekToRestartPoint:
   //
@@ -338,9 +361,10 @@ class Block::Iter : public Iterator {
     } while (ParseNextKey() && NextEntryOffset() < original);
   }
 
+  //Yuanguo: 在Block内找第一个 >= target 的kv-pair； 
   //Yuanguo: `target` is the non shared part of the key.
   //Yuanguo: NO!!!! this is not true: for the 1st entry of every "restart", "shared-bytes" is always 0, so `target`
-  //         is the complete key;
+  //         is the complete key or prefix;
   void Seek(const Slice& target) override {
     // Binary search in restart array to find the last restart point
     // with a key < target
@@ -350,6 +374,7 @@ class Block::Iter : public Iterator {
       uint32_t mid = (left + right + 1) / 2;
       uint32_t region_offset = GetRestartPoint(mid);
       uint32_t shared, non_shared, value_length;
+      //Yuanguo: 解析第mid个Restart的第一个Entry (其key一定是完整的，不和前面有公共部分)；
       const char* key_ptr =
           DecodeEntry(data_ + region_offset, data_ + restarts_, &shared,
                       &non_shared, &value_length);
@@ -373,15 +398,52 @@ class Block::Iter : public Iterator {
       }
     }
 
+    //Yuanguo: 上面的while循环结束时，
+    //
+    //case-1: mid=X+1, left = right = X
+    //     +---------------+   +-----------------+
+    //     |   Restart-X   |   |   Restart-X+1   |
+    //     +---------------+   +-----------------+
+    //              ^
+    //              |
+    //            target
+    //
+    //case-2: mid=X+1, left = right = X, 和case-1一样；
+    //     +---------------+   +-----------------+
+    //     |   Restart-X   |   |   Restart-X+1   |
+    //     +---------------+   +-----------------+
+    //                       ^
+    //                       |
+    //                     target
+    //
+    //case-3: mid=1, left = right = 0；
+    //     +---------------+   +-----------------+
+    //     |   Restart-0   |   |   Restart-1     |
+    //     +---------------+   +-----------------+
+    //   ^ 
+    //   |
+    // target
+    //
+    //case-4: mid=Max, left = right = Max；
+    //     +---------------+   +-----------------+
+    //     | Restart-Max-1 |   |  Restart-Max    |
+    //     +---------------+   +-----------------+
+    //                                              ^ 
+    //                                              |
+    //                                            target
+    //
+    //所以，无论那种情况，都要在Restart[left]中寻找。
+
     // Linear search (within restart block) for first key >= target
-    // Yuanguo: within? it's possible that "target" is in next restart (the first key of next restart); see the above line:
-    //      right = mid - 1; 
+    // Yuanguo: SeekToRestartPoint()之后，总是紧接着ParseNextKey();
     SeekToRestartPoint(left);
     while (true) {
       if (!ParseNextKey()) {
+        //Yuanguo: ParseNextKey()返回了false；此时本函数返回，Iter是一个invalid状态；
         return;
       }
       if (Compare(key_, target) >= 0) {
+        //Yuanguo: Iter指向第一个 >=target 的Entry；
         return;
       }
     }
@@ -420,6 +482,7 @@ class Block::Iter : public Iterator {
     const char* limit = data_ + restarts_;  // Restarts come right after data
     if (p >= limit) {
       // No more entries to return.  Mark as invalid.
+      // Yuanguo: 见Valid(): return current_ < restarts_; 这里让它们相等，就是invalid;
       current_ = restarts_;
       restart_index_ = num_restarts_;
       return false;
@@ -441,15 +504,19 @@ class Block::Iter : public Iterator {
       //           a. seek to a "restart" < `current_`;
       //           b. parse keys in the "restart" one by one;
       //    also see my comments for `Block::Iter::key_` above;
+      //
+      // Yuanguo: 见前面的"循环不变式"：调用ParseNextKey()之前，循环不变式应该保证成立。
 
       // Yuanguo: truncate the suffix, keeping the shared bytes only;
       key_.resize(shared);
       // Yuanguo: append the non shared bytes;
       key_.append(p, non_shared);
       value_ = Slice(p + non_shared, value_length);
-      // Yuanguo: update restart_index_ if we have finished a "restart";
-      //    if current_ points to the starting entry of the N-th "restart", restart_index_ is not updated and still
-      //    points to (N-1)-th "restart"; it is in purpose: restart_index_ is used for `Prev()`;
+      // Yuanguo: update restart_index_。restart_index_和current_的关系有两种情况：
+      //       - current_ 指向Restart[X]的第一个Entry，则restart_index_ = X-1;
+      //       - 否则current_ 指向Restart[X]中间的或最后的Entry，则restart_index_ = X;
+      // it is in purpose: restart_index_ is used for `Prev()`; 这样要找current_的前一个Entry时，总能
+      // 在Restart[restart_index_]中找。
       while (restart_index_ + 1 < num_restarts_ &&
              GetRestartPoint(restart_index_ + 1) < current_) {
         ++restart_index_;

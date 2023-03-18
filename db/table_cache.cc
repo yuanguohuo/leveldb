@@ -38,11 +38,40 @@ TableCache::TableCache(const std::string& dbname, const Options& options,
 
 TableCache::~TableCache() { delete cache_; }
 
+//Yuanguo:
+//
+//   +----------------+
+//   |   TableCache   |   +------------------------------> +---------------------------+    +--> +---------------------------------------------------------------+
+//   |                |   |                                |              Table        |    |    |                         BlockCache                            |
+//   | +------------+ |   |                                +---------------------------+    |    +---------------------------------------------------------------+
+//   | |TableAndFile| |   |                                | rep_->options.block_cache |    |    | +---------------+     +---------------+     +---------------+ |
+//   | +------------+ |   |  +--> +----------------+ <-----|-rep_->file                |    |    | | Block         | ... | Block         | ... | Block         | |
+//   | | table  ----|-|---+  |    |RandomAccessFile|       | rep_->cache_id            |    |    | +---------------+     +---------------+     +---------------+ |
+//   | | file   ----|-|------+    +----------------+       | rep_->filter              |    |    | |data_          |     |data_          |     |data_          | |
+//   | +------------+ |                                    | rep_->index_block --------|----+    | |size_          |     |size_          |     |size_          | |
+//   |                |                                    +---------------------------+    ^    | |restart_offset_|     |restart_offset_|     |restart_offset_| |
+//   |                |                                                                     ^    | +---------------+     +---------------+     +---------------+ |
+//   |     ...        |                                                                     |    |                                                               |
+//   |                |                                                                     |    | +---------------+     +---------------+     +---------------+ |
+//   |                |                                                                     |    | | Block         | ... | Block         | ... | Block         | |
+//   |                |   +------------------------------> +---------------------------+    |    | +---------------+     +---------------+     +---------------+ |
+//   |                |   |                                |              Table        |    |    | |data_          |     |data_          |     |data_          | |
+//   | +------------+ |   |                                +---------------------------+    |    | |size_          |     |size_          |     |size_          | |
+//   | |TableAndFile| |   |                                | rep_->options.block_cache |    |    | |restart_offset_|     |restart_offset_|     |restart_offset_| |
+//   | +------------+ |   |  +--> +----------------+ <-----|-rep_->file                |    |    | +---------------+     +---------------+     +---------------+ |
+//   | | table  ----|-|---+  |    |RandomAccessFile|       | rep_->cache_id            |    |    |                                                               |
+//   | | file   ----|-|------+    +----------------+       | rep_->filter              |    |    |                            ......                             |
+//   | +------------+ |                                    | rep_->index_block --------|----+    +---------------------------------------------------------------+
+//   |                |                                    +---------------------------+
+//   |     ...        |
+//   |                |
+//   +----------------+
 Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
                              Cache::Handle** handle) {
   Status s;
   char buf[sizeof(file_number)];
   EncodeFixed64(buf, file_number);
+  //Yuanguo: key是"encoded-file_number";
   Slice key(buf, sizeof(buf));
   *handle = cache_->Lookup(key);
   if (*handle == nullptr) {
@@ -69,6 +98,10 @@ Status TableCache::FindTable(uint64_t file_number, uint64_t file_size,
       TableAndFile* tf = new TableAndFile;
       tf->file = file;
       tf->table = table;
+      //Yuanguo:
+      //   key          : "encoded-file_number";
+      //   value        : tf;
+      //   返回的handle : LRUHandle{key="encoded-file_number"; value=tf;};
       *handle = cache_->Insert(key, tf, 1, &DeleteEntry);
     }
   }
@@ -90,6 +123,11 @@ Iterator* TableCache::NewIterator(const ReadOptions& options,
 
   Table* table = reinterpret_cast<TableAndFile*>(cache_->Value(handle))->table;
   Iterator* result = table->NewIterator(options);
+  //Yuanguo:
+  //  - 上面通过调用 FindTable --> cache_->Insert(见LRUCache::Insert及其中注释)创建了一个Handle* handle;
+  //  - 这个handle用完之后需要通过cache_->Release(handle)来释放；究竟handle是否被cache缓存了、有没有别的user通过Lookup持有了handle，都不用关心；
+  //  - 所以，这里注册一个回调函数，在result(Iterator)析构的时候触发Release。Release之后，可能也还在cache中缓存，也可能不在。
+  //对比: TableCache::Get()，用完立即Release(handle);
   result->RegisterCleanup(&UnrefEntry, cache_, handle);
   if (tableptr != nullptr) {
     *tableptr = table;

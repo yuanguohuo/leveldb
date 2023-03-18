@@ -61,6 +61,18 @@ inline void EncodeFixed32(char* dst, uint32_t value) {
   buffer[3] = static_cast<uint8_t>(value >> 24);
 }
 
+//Yuanguo:
+//
+// most-significant-byte  least-significant-byte
+//            |                    |
+//            V                    V
+//    value = A  B  C  D  E  F  G  H
+//
+//    buffer[0]   =  H；即 [56b, 64b)
+//    buffer[1]   =  G；即 [48b, 56b)
+//    buffer[2]   =  F；即 [48b, 56b)
+//    ...
+//    buffer[7]   =  A；即 [0b, 8b)
 inline void EncodeFixed64(char* dst, uint64_t value) {
   uint8_t* const buffer = reinterpret_cast<uint8_t*>(dst);
 

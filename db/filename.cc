@@ -120,16 +120,25 @@ bool ParseFileName(const std::string& filename, uint64_t* number,
   return true;
 }
 
+//Yuanguo: 等价于
+//  echo -n "MANIFEST-0000001\n" > tmp
+//  mv tmp dbname/CURRENT
 Status SetCurrentFile(Env* env, const std::string& dbname,
                       uint64_t descriptor_number) {
   // Remove leading "dbname/" and add newline to manifest file name
+  // Yuanguo: manifest形如
+  //     {dbname}/MANIFEST-0000001
   std::string manifest = DescriptorFileName(dbname, descriptor_number);
   Slice contents = manifest;
   assert(contents.starts_with(dbname + "/"));
+  //Yuanguo: contents形如:
+  //     MANIFEST-0000001\n
   contents.remove_prefix(dbname.size() + 1);
   std::string tmp = TempFileName(dbname, descriptor_number);
+  //Yuanguo: 把contents (MANIFEST-0000001\n) 写入tmp文件并sync；
   Status s = WriteStringToFileSync(env, contents.ToString() + "\n", tmp);
   if (s.ok()) {
+    //Yuanguo: mv tmp dbname/CURRENT
     s = env->RenameFile(tmp, CurrentFileName(dbname));
   }
   if (!s.ok()) {

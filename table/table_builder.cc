@@ -118,6 +118,9 @@ void TableBuilder::Add(const Slice& key, const Slice& value) {
     std::string handle_encoding;
     r->pending_handle.EncodeTo(&handle_encoding);
     // Yuanguo: the key of the block index is the largest key?
+    //   是的。按定义，block index的key IndexKey要满足:
+    //         对应的data-block的最大key <= IndexKey < 下一个data-block的最小key
+    //   显然，对应的data-block的最大key 满足，所以使用它也最简单。
     r->index_block.Add(r->last_key, Slice(handle_encoding));
     r->pending_index_entry = false;
   }

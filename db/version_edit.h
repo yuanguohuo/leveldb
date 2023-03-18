@@ -83,11 +83,31 @@ class VersionEdit {
  private:
   friend class VersionSet;
 
+  //Yuanguo:                level, file-number
   typedef std::set<std::pair<int, uint64_t>> DeletedFileSet;
 
   std::string comparator_;
+  //Yuanguo: 一个log/wal文件对应的memtable已经持久化成table file之后，这个log/wal文件就没有用了；
+  //  log_number_记录的是最小的有用的log/wal；也就是说，log_number_-1以及之前的，都无用了；
+  //  所以，这里记录并持久化log_number_，相当于 truncate-log 操作。
+  //
+  //  重要：truncate-log要和"对持久化的table file的引用"作为一个原子被持久化；
+  //     - 持久化table file之后，立即崩溃也无所谓：这时log_number_没有更新，也没有任何Version/VersionEdit引用持久化的table file；
+  //       所以，table file是一个无用的文件。重启之后，重新replay log，生成memtabe，再持久化成新的table file；
+  //     - 而一旦 log_number_ 和 "对持久化的table file的引用" 被原子地持久化，崩溃再重启时，就不replay truncate的log/wal，其对应的内容
+  //       已经在持久化的table file中。
+  //     - 本类(VersionEdit)就是原子地持久化log_number_ 和 "对持久化的table file的引用"
+  //              - log_number_在这里;
+  //              - "对持久化的table file的引用"在new_files_中；
   uint64_t log_number_;
+  //Yuanguo: 新版的LevelDB不再使用prev_log_number_，见DBImpl::Recover()中的注释。
   uint64_t prev_log_number_;
+  //Yuanguo:
+  //  next_file_number_是文件号分配器。
+  //    - manifest文件、log/wal文件、table file的文件号，都是通过递增这个计数器来分配的。
+  //    - 这个计数器，运行时存在于VersionSet::next_file_number_中。它总是在产生新Version的时候递增。
+  //      产生新Version，也必然要产生并持久化VersionEdit, 自然，把它存到VersionEdit中并持久化；
+  //    - crash/stop之后重启时，VersionSet::Recover()函数再把它加载到VersionSet::next_file_number_中。
   uint64_t next_file_number_;
   SequenceNumber last_sequence_;
   bool has_comparator_;

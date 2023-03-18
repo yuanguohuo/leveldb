@@ -84,13 +84,40 @@ Version::~Version() {
   }
 }
 
-// Yuanguo: the same logic as seeking a block in a table: the key of the block index is 
+// Yuanguo: the same logic as seeking a block in a table: the key of the block index is
 //   the largest key of that block, just like `f->largest` here;
 //   the returned block is the first block whose largest key >= "target"; so "target"
-//   may only exist in this block: 
+//   may only exist in this block:
 //       previous blocks  : largest key < "target";
 //       following blocks : first key > "target";
 //   here, `FindFile` returns the first file whose largest key >= "target";
+//
+// Yuanguo:  return N
+//          fM.largest < key
+//          fN.largest >= key
+//    +------ fM ----------+
+//    | smallest           |
+//    | ...                |
+//    | ...                |
+//    | largest            |
+//    +--------------------+
+//    +------ fN ----------+
+//    | smallest           |
+//    | ...                |
+//    | ...                |
+//    | largest            |
+//    +--------------------+
+//    +------ fO ----------+
+//    | smallest           |
+//    | ...                |
+//    | ...                |
+//    | largest            |
+//    +--------------------+
+//
+//    所以: key只可能在fN范围内:
+//        - key一定不在fM范围内，因为fM.largest < key
+//        - key一定不在fO范围内，因为fO.smallest > key
+//
 int FindFile(const InternalKeyComparator& icmp,
              const std::vector<FileMetaData*>& files, const Slice& key) {
   uint32_t left = 0;
@@ -111,6 +138,10 @@ int FindFile(const InternalKeyComparator& icmp,
   return right;
 }
 
+//Yuanguo:
+//   在AfterFile()中，nullptr代表最小key；所以user_key改名为smallest_user_key更合适；
+//   在BeforeFile()中，nullptr代表最大key；所以user_key改名为largest_user_key更合适；
+//见SomeFileOverlapsRange()对它们的调用;
 static bool AfterFile(const Comparator* ucmp, const Slice* user_key,
                       const FileMetaData* f) {
   // null user_key occurs before all keys and is therefore never after *f
@@ -133,7 +164,7 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
   const Comparator* ucmp = icmp.user_comparator();
   if (!disjoint_sorted_files) {
     // Need to check against all files
-    // Yuanguo: for levels other than level-0;
+    // Yuanguo: for level-0; Level-0的各个文件是可以相交的，所以只能遍历；
     for (size_t i = 0; i < files.size(); i++) {
       const FileMetaData* f = files[i];
       if (AfterFile(ucmp, smallest_user_key, f) ||
@@ -147,7 +178,7 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
   }
 
   // Binary search over file list
-  // Yuanguo: for level-0;
+  // Yuanguo: for levels other than level-0; 其他层的文件不相交，可以binary search;
   uint32_t index = 0;
   if (smallest_user_key != nullptr) {
     // Find the earliest possible internal key for smallest_user_key
@@ -166,6 +197,42 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
   // Yuanguo: files[index] is the first file whose largest key >= small_key;
   //   if largest_user_key is befor it (largest_user_key < its smallest key), no overlap;
   //   else, overlap;
+  // Yuanguo: 已知 smallest_user_key <= files[index].largest;
+  //  case-1:                                   files[index].smallest         files[index].largest
+  //                                                    |                             |
+  //                                                    V                             V
+  //                                                    +-----------------------------+
+  //                                                    |                             |
+  //                                                    +-----------------------------+
+  //                                                          ^                  ^
+  //                                                          |                  |
+  //                                                   smallest_user_key   largest_user_key
+  //
+  //
+  //  case-2:                                   files[index].smallest         files[index].largest
+  //                                                    |                             |
+  //                                                    V                             V
+  //                                                    +-----------------------------+
+  //                                                    |                             |
+  //                                                    +-----------------------------+
+  //                                              ^                              ^
+  //                                              |                              |
+  //                                        smallest_user_key              largest_user_key
+  //
+  //
+  //  case-3:                                   files[index].smallest         files[index].largest
+  //                                                    |                             |
+  //                                                    V                             V
+  //                                                    +-----------------------------+
+  //                                                    |                             |
+  //                                                    +-----------------------------+
+  //                            ^                   ^
+  //                            |                   |
+  //                      smallest_user_key   largest_user_key
+  //
+  // 所以，是否overlap，取决于largest_user_key是否before file；
+  //        largest_user_key before file:      case3，没有overlap；
+  //        largest_user_key not before file:  case-1和case-2，有overlap；
   return !BeforeFile(ucmp, largest_user_key, files[index]);
 }
 
@@ -174,6 +241,26 @@ bool SomeFileOverlapsRange(const InternalKeyComparator& icmp,
 // is the largest key that occurs in the file, and value() is an
 // 16-byte value containing the file number and file size, both
 // encoded using EncodeFixed64.
+//Yuanguo: version V的第L层，有N个file：
+//      fP   +------------------+
+//           |                  |
+//           |     largest      |
+//           +------------------+
+//      fQ   +------------------+
+//           |                  |
+//           |     largest      |
+//           +------------------+
+//      ...
+//      fX   +------------------+
+//           |                  |
+//           |     largest      |
+//           +------------------+
+//
+// 迭代：
+//       fP.larget =====>  {P, size-of-fP}
+//       fQ.larget =====>  {Q, size-of-fQ}
+//          ...
+//       fX.larget =====>  {X, size-of-fX}
 class Version::LevelFileNumIterator : public Iterator {
  public:
   LevelFileNumIterator(const InternalKeyComparator& icmp,
@@ -225,6 +312,8 @@ class Version::LevelFileNumIterator : public Iterator {
 
 // Yuanguo: get the iterator of the "Table object" corresponding to the file;
 //   it's the return value of "Table::NewIterator()" in table/table.cc;
+//   file_value是 {file_number, file_size}，
+//   也就是上面Version::LevelFileNumIterator迭代产生的结果；
 static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
                                  const Slice& file_value) {
   TableCache* cache = reinterpret_cast<TableCache*>(arg);
@@ -240,8 +329,14 @@ static Iterator* GetFileIterator(void* arg, const ReadOptions& options,
 // Yuanguo: return a TwoLevelIterator, it is the iterator of "files in a given level";
 //   upper level: LevelFileNumIterator, which yields file (largest_key => number..file_size) one by one;
 //   lower level: table iterator created by "GetFileIterator()", which yields kv pairs in the table/file;
-// Notice, lower level (the table iterator) is also a TwoLevelIterator, see "Table::NewIterator()" in 
+// Notice, lower level (the table iterator) is also a TwoLevelIterator, see "Table::NewIterator()" in
 // table/table.cc;
+//   即，嵌套结构:
+//       NewTwoLevelIterator
+//             index_iter_/upper (LevelFileNumIterator): 迭代产生largest_key_in_file#F ==> Slice{file#F, file_size}
+//             data_iter_/lower (NewTwoLevelIterator): 使用upper迭代输出的Slice{file#F, file_size}构建的，Table::NewIterator()返回的，也是一个NewTwoLevelIterator，见GetFileIterator();
+//                        index_iter_/upper: 迭代产生一个个的block handle; block handle用来创建block内的Iterator;
+//                        data_iter_/lower: 使用upper迭代输出的block handle构建的，block内的Iterator，迭代产生key-val-pairs;
 Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
                                             int level) const {
   return NewTwoLevelIterator(
@@ -249,11 +344,20 @@ Iterator* Version::NewConcatenatingIterator(const ReadOptions& options,
       vset_->table_cache_, options);
 }
 
-// Yuanguo: [level0_file0, level0_file1, ..., level0_fileN, level1, level2, ...]
+// Yuanguo: [
+//           Iterator-level0-file0, Iterator-level0-file1, ..., Iterator-level0-fileN,
+//           Iterator-level1,
+//           Iterator-level2,
+//           ...,
+//          ]
 void Version::AddIterators(const ReadOptions& options,
                            std::vector<Iterator*>* iters) {
   // Merge all level zero files together since they may overlap
   // Yuanguo: how are they merged? I don't see any merge here.
+  // Yuanguo: 这些iterator都被放进vector iters，最终被用来构造
+  //          一个NewMergingIterator。见:
+  //            DBImpl::NewInternalIterator() -->
+  //            NewMergingIterator()
   for (size_t i = 0; i < files_[0].size(); i++) {
     iters->push_back(vset_->table_cache_->NewIterator(
         options, files_[0][i]->number, files_[0][i]->file_size));
@@ -305,14 +409,16 @@ static bool NewestFirst(FileMetaData* a, FileMetaData* b) {
   return a->number > b->number;
 }
 
-// Yuanguo: 
+// Yuanguo: ForEachOverlapping的逻辑：
 //   1. for each file `f` in level-0: if `f` overlaps with user_key, call `func` on it;
 //   2. for level 1, 2, ..., find the find `f` overlapping with internal_key, call `func` on it;
 // the process stops once `func` returns false;
 //
+//ForEachOverlapping有两个使用场景：
+//
 // Version::Get,
 //    user_key/internal_key: the key to get; they are used to find potential files (overlapping files);
-//    func: a Match function; 
+//    func: a Match function;
 //            if func(potential_file) return false, meaning target key is FOUND, ForEachOverlapping will return;
 //            else, func(potential_file) return true, meaning NOT FOUND, ForEachOverlapping will keep trying;
 // it goes like this:
@@ -356,6 +462,7 @@ void Version::ForEachOverlapping(Slice user_key, Slice internal_key, void* arg,
     if (num_files == 0) continue;
 
     // Binary search to find earliest index whose largest key >= internal_key.
+    // Yuanguo: 为什么这里使用internal_key?
     uint32_t index = FindFile(vset_->icmp_, files_[level], internal_key);
     if (index < num_files) {
       FileMetaData* f = files_[level][index];
@@ -388,9 +495,25 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
     bool found;
 
     // Yuanguo: if file `f` contains ikey, returns false; else return true (keep searching);
+    //   返回：要不要继续搜索，true继续，false停止；
     static bool Match(void* arg, int level, FileMetaData* f) {
       State* state = reinterpret_cast<State*>(arg);
 
+      //Yuanguo: state->stats的作用是什么？
+      //    如果为了get k调用了多次Match()，就把第一次的f记录到state->stats中。
+      //    如果只调用了一次Match()则不记 (为什么？)；
+      // 如果记了，DBImpl::Get()中就会调用Version::UpdateStats():
+      //    state->stats->seek_file.allowed_seeks--;
+      // 如果递减之后，allowed_seeks为0了，则把这个文件以及它的level记录到
+      //    Version::file_to_compact_,
+      //    Version::file_to_compact_level_,
+      // 等待compaction；
+      // Version::RecordReadSample()类似。
+      //
+      // 一个file被seek次数很多次(allowed_seeks递减为0)，则要compact它。背后逻辑:
+      //    根据局部性原理，以后它还会被seek很多次，
+      //    compact它会让以后的seek更高效，
+      //    所以要compact它。
       if (state->stats->seek_file == nullptr &&
           state->last_file_read != nullptr) {
         // We have had more than one seek for this read.  Charge the 1st file.
@@ -436,6 +559,19 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   state.last_file_read_level = -1;
 
   state.options = &options;
+
+  //Yuanguo: LookupKey的结构:
+  //
+  //           4字节                                                       1B       7B
+  //   +--------------------+--------------------------------------------+----+-----------------+
+  //   | "user_key的长度+8" |               user_key的数据               |type| seq(低字节在前) |
+  //   +--------------------+--------------------------------------------+----+-----------------+
+  //   ^    即后面总长度    ^                                                                   ^
+  //   |                    |                                                                   |
+  // start_              kstart_                                                               end_
+  //
+  //k.internal_key() : kstart_ 到 end_ 的部分，包括 type + seq;
+  //k.user_key()     : user_key的数据部分，不包括 type + seq;
   state.ikey = k.internal_key();
   state.vset = vset_;
 
@@ -444,6 +580,100 @@ Status Version::Get(const ReadOptions& options, const LookupKey& k,
   state.saver.user_key = k.user_key();
   state.saver.value = value;
 
+  //Yuanguo:
+  //  1. 先找到overlapping的文件f (user_key可能在f中)，这里用user_key来找overlapping(为什么user_key)。
+  //  2. 对文件f调用State::Match(&state, level, f);
+  //          - f是一个(持久化的)Table;
+  //          - 在f (Table) 中找第一个 >= internal_key的kv-pair {ik,v}，然后调用SaveValue(&saver, ik, v);
+  //                  - SaveValue中再解析出ik (internal key) 中的user key, 并和这里的saver.user_key比较；
+  //                  - 若相等，则看是Deleted还是Found；
+  //                  - 若Found，则把v存到saver.value中；
+  //  问题：LookupKey中的user_key和internal_key如何起作用的？看下面的例子。
+  //
+  //  例如我们get的目标是d:500。思路是这样的：
+  //      - 对于一个"潜在的可能的文件f"，找f中的"第一个>=d:500的key"，记为TargetKey;
+  //      - TargetKey可能是d:x(x<=500) ..., 也可能是e:x(x任意);
+  //      - SaveValue函数对它进行判断：
+  //            - 若是d:x(x<=500)，则找到了；
+  //            - 否则，是e:x，则没找到；需要继续找别的文件；
+  //
+  //  如何找"潜在的可能的文件f"呢？对于第0层和第1-N层又不同：第0层可能有很多潜在的可能的文件；而第1-N层中，每层只有一个。
+  //
+  //  对于第0层：
+  //      - 使用user_key来找overlapping的文件，它们都是潜在的可能的文件。
+  //      - 按文件的新旧排序，最新的在最前，例如 f0 = [b:800, f:600], f1 = [c:300, g:400], f2 = [a:200, g:100]
+  //      - ForEachOverlapping中调用func(state, 0, f)，即State::Match(state, 0, f):
+  //            - 对于f = f0，假如其中有d:540，调用state->vset->table_cache_->Get(...)，传入的是ikey="d:500";
+  //              TableCache::Get() --> Table::InternalGet()，因为传入的k="d:500"，所以跳过了"d:540"（因为d:540排在d:500之前）。
+  //                   - 假如找到的"第一个>=d:500的key"，即TargetKey是e:x(x任意);
+  //                   - 调用handle_result，即SaveValue(saver, "e:x", "vvvvv")：因为"d"!="e"，所以saver.state保持为kNotFound不变；
+  //              所以State::Match()返回true，意思是：在f=f0中没有找到"d:x"(x<=500)，所以要继续；
+  //            - 对于 f = f1，假如其中没有d:x，State::Match() --> TableCache::Get() --> Table::InternalGet()找到的"第一个>=d:500的key"，即TargetKey，是e.x:
+  //              和上面一样。
+  //            - 对于 f = f2，假如其中有两个d:x(x<=500): "d:188"和"d:187"，State::Match() --> TableCache::Get() --> Table::InternalGet()中找到的"第一个>=d:500的key"，
+  //              即TargetKey，一定是"d:188"，调用handle_result，即SaveValue(saver, "d:188", ...)，因为"d"=="d"，所以saver.state被置为kFound/kDeleted；
+  //              所以State::Match()返回false，意思是在f=f2中，找到"d:x"(x<=500)，不再继续；
+  //
+  //  上面是第0层成功找到的情况，假如第0成失败，
+  //
+  //  对于level = 1~N层：
+  //      - 因为对于1~N层，文件是有序的，所以ForEachOverlapping直接调用FindFile(internal_comparator, files[level], internal_key="d:500")找：第一个满足
+  //        "f.largest_internal_key>=d:500"的f；
+  //
+  //            例1，返回f1:
+  //                f0:   [a:970, ......................, b:900]      -->    b:900 < d:500
+  //                f1:   [c:239, ..., c:110, e:522, ..., e:419]      -->    e:419 > d:500，返回f1
+  //                f2:   [f:539, ......................, g:430]
+  //
+  //            例2，返回f1:
+  //                f0:   [a:970, ......................, b:900]      -->    b:900 < d:500
+  //                f1:   [c:239, ..., d:610, d:413, ..., e:419]      -->    e:419 > d:500，返回f1
+  //                f2:   [f:539, ......................, g:430]
+  //
+  //            例3，返回f2:
+  //                f0:   [a:800, ......................, b:910]      -->    b:910 < d:500
+  //                f1:   [b:909, ......................, d:540]      -->    d:540 < d:500
+  //                f2:   [d:539, ..., d:520, d:500, ..., d:444]      -->    d:444 > d:500，返回f2
+  //
+  //            例4，返回f1:
+  //                f0:   [a:800, ......................, c:910]      -->    c:910 < d:500
+  //                f1:   [e:123, ......................, f:456]      -->    f:456 > d:500，返回f1
+  //                f2:   [g:539, ......................, h:430]
+  //
+  //      - f有3种情况：
+  //            case1. user_key有overlap(区间[c, e]包含d)，但其中没有"d:x"，例1；
+  //            case2. user_key有overlap，且其中也有"d:x"，例2、3;
+  //            case3. user_key没有overlap，例4；
+  //        但，不管哪种，第level层中的"第一个>=d:500的key"，即TargetKey，一定在f中，因为：
+  //            它前面的fx: fx.largest_internal_key  < d:500
+  //            它后面的fy: fy.smallest_internal_key > d:500 (因为fy.smallest_internal_key > f.largest_internal_key >= d:500)
+  //        即，当前层中，只有这个f是潜在的可能的文件。
+  //
+  //      - 所以，对于f:
+  //            - case1和case2: user_key有overlap，则调用func，即State::Match() --> TableCache::Get() --> Table::InternalGet()，
+  //              在f中找第一个大于>="d:500"的key，
+  //                   可能是e:x即e:522 (case1-例1);
+  //                   也可能是d:x，"d:413" (case2-例2)，"d:500" (case2-例3);
+  //              由Table::InternalGet() --> handle_result(即SaveValue)进一步判断；
+  //            - case3: user_key没有overlap，直接下一层。因为"第一个>=d:500的key"一定不是"d:x"，例4的"e:123"，
+  //              让Table::InternalGet() --> handle_result(即SaveValue)判断也一定失败。
+  //
+  //  回到前面的问题：LookupKey中的user_key和internal_key如何起作用的？
+  //     - 其实，无论对于Level-0还是Level-1到N，我们的目的都是找"第一个>=d:500的key"，即TargetKey。
+  //     - 对于第1-N层，因为各个table file没有overlap，所以可以直接找第一个满足"f.largest_internal_key>=d:500"的f; TargetKey一定在其中，因为：
+  //            它前面的fx: fx.largest_internal_key  < d:500
+  //            它后面的fy: fy.smallest_internal_key > d:500 (因为fy.smallest_internal_key > f.largest_internal_key >= d:500)
+  //       即，当前层中，只有这个f是潜在的可能的文件。所以直接使用internal_key去找f;
+  //     - 对于第0层，因为各个table file是有overlap的，所以没法直接使用internal_key，而只好使用user_key，找和user_key有overlap的所有f，在按重新到旧排列，
+  //       它们都是潜在的可能的文件，需要一一搜索。
+  //
+  //  粗略的想：Get()是找到某个key，而DBImpl::NewIterator()然后Seek到某个位置上，也是找到某个key；它们的消耗应该差不多。
+  //  但实际上却不是这样的:
+  //
+  //  假如操作是这样的：put(k1), delete(k1), put(k2), delete(k2), ..., put(k8), delete(k8), put(k9);
+  //     Seek(k1): 需要跳过k1:kDeleted, k1:kTypeValue, k2:kDeleted, k2:kTypeValue, ..., k8:kDeleted, k8:kTypeValue，
+  //               最终Iterator指向有效的k9:kTypeValue。假如要跳过1亿条呢？
+  //     Get(k1):  找到k1:kDeleted，就可以返回NotFound了。
   ForEachOverlapping(state.saver.user_key, state.ikey, &state, &State::Match);
 
   return state.found ? state.s : Status::NotFound(Slice());
@@ -462,7 +692,7 @@ bool Version::UpdateStats(const GetStats& stats) {
   return false;
 }
 
-// Yuanguo: when a number of bytes (randomly picked, e.g. 1.5MB) has been read, this function will 
+// Yuanguo: when a number of bytes (randomly picked, e.g. 1.5MB) has been read, this function will
 //   be called once; see DBIter::ParseKey in db/db_iter.cc;
 bool Version::RecordReadSample(Slice internal_key) {
   ParsedInternalKey ikey;
@@ -491,8 +721,8 @@ bool Version::RecordReadSample(Slice internal_key) {
   state.matches = 0;
 
   // Yuanguo: for each file overlapping with `ikey`, call `State::Match`;
-  //   if there're more than one 
-  //       state.matches will be >=2, and 
+  //   if there're more than one
+  //       state.matches will be >=2, and
   //       state.stats.seek_file = the first one;
   //   (note: multiple files overlapping with one key ==> compactable)
   ForEachOverlapping(ikey.user_key, internal_key, &state, &State::Match);
@@ -505,7 +735,7 @@ bool Version::RecordReadSample(Slice internal_key) {
     // 1MB cost is about 1 seek (see comment in Builder::Apply).
 
     // Yuanguo: multiple files overlapping with one key ==> compactable
-    //   but not set compactable immediately, instead, 
+    //   but not set compactable immediately, instead,
     //        1. decrement `allowed_seeks`;
     //        2. when `allowed_seeks` down to 0, set compactable (`file_to_compact_` and `file_to_compact_level_`);
     return UpdateStats(state.stats);
@@ -531,6 +761,12 @@ bool Version::OverlapInLevel(int level, const Slice* smallest_user_key,
 }
 
 //Yuanguo: at which level shall we flush a memtable [smallest_user_key, largest_user_key]?
+//    1. if the memtable overlaps with Level-0, then flush it at Level-0;
+//    2. else, not overlap with Level-0, but overlap with Level-N+1, then flush it at Level-N;
+//    3. else, not overlap with Level-N+1, but overlaps too many with Level-N+2, then flush it at Level-N;
+//    otherwise, N++;
+// 之前，我以为一定flush在level-0上。看来不是这样的：假如没有overlap，尽量放在kMaxMemCompactLevel=2层。为什么？
+// 看kMaxMemCompactLevel的注释。
 int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
                                         const Slice& largest_user_key) {
   int level = 0;
@@ -562,6 +798,32 @@ int Version::PickLevelForMemTableOutput(const Slice& smallest_user_key,
 }
 
 // Store in "*inputs" all files in "level" that overlap [begin,end]
+// Yuanguo: 这里引入一个定义：
+//    第level层的文件列表是(肯定是按最小key的从小到大排列，第0层也是一样，见VersionSet::Builder::SaveTo函数，那里生成一个Version)：
+//      [f1, f2, f3, f4];
+//    GetOverlappingInputs()输出的inputs = [f2, f3]
+//      - 若f2的最小key和f1的最大key的user-key部分相同，则称为左边界是模糊的，反之为称之为清晰的；
+//      - 若f3的最大key和f4的最小key的user-key部分相同，则称为右边界是模糊的，反之为称之为清晰的；
+// GetOverlappingInputs()输出的边界都可能是模糊的。
+//
+// 对于Level>0：
+//           f1                f2                 f3                 f4             f5
+//      [a:555, d:777]    [d:716,  g:553]    [h:812, k:654]    [k:650, m:800]   [n:828, p:700]
+//
+//      注：有没有可以产生这种分布呢？是有的。见DBImpl::DoCompactionWork()函数。
+//
+// 若begin=e:*; end=j:*;
+// 则inputs=[f2, f3];
+//
+// 注意：把f2和f3压缩到第level+1层是错误的：
+//    - 右边：k:654被压缩到第level+1层，而k:650留在第level层。Get的时候就会返回k:650（因为逐层搜索），这是一个过时版本。
+//    - 左边：没有问题。
+//    - 可见右边界清晰是压缩正确性的保障。
+//
+// 如何解决呢？答案是AddBoundaryInputs()函数，它确保右边界是清晰的(把f4加加进去)
+//
+// 对于Level=0:
+//   因为table file之间可能有overlap，所以，本函数把user key overlap的所有文件都找出来。所以，也就不存在上述问题。
 void Version::GetOverlappingInputs(int level, const InternalKey* begin,
                                    const InternalKey* end,
                                    std::vector<FileMetaData*>* inputs) {
@@ -585,38 +847,37 @@ void Version::GetOverlappingInputs(int level, const InternalKey* begin,
     } else if (end != nullptr && user_cmp->Compare(file_start, user_end) > 0) {
       // "f" is completely after specified range; skip it
     } else {
+      //Yuanguo: it's very clear for level != 0, the only overlapping file is f;
       inputs->push_back(f);
 
-      //Yuanguo: it's very clear for for level != 0;
-      //  for, level==0:
+      //Yuanguo: for, level==0:
       //                           user_begin       user_end
       //                              |               |
       //           f1s         f1l    |               |
       // file-1    |------------|     |               |
-      //                              |               |
-      //                              |               |        f2s      f2l
-      // file-2                       |               |         |--------|
-      //                              |               |
-      //               f3s            |       f3l     |
-      // file-3         |-------------+--------|      |
-      //                              |               |
-      //                              |     f4s       |            f4l
-      // file-4                       |      |--------+-------------|
-      //                              |               |       
+      //               f2s            |       f2l     |
+      // file-2         |-------------+--------|      |
+      //                              |     f3s       |            f3l
+      // file-3                       |      |--------+-------------|
+      //                              |               |        f4s      f4l
+      // file-4                       |               |         |--------|
       //                              |               |                       f5s    f5l
       // file-5                       |               |                         |-----|
       //
       //
-      // a. file-1 and file-2 are skipped at first;
-      // b. but, when file-3 is encountered `user_begin` is set to `f3s` (file-3-start), and search is restarted,
-      //    so file-1 will be included and `user_begin` will be set to `f1s` and search is restarted again;
-      // c. when file-4 is encountered, `user_end` is set to `f4l` (file-4-limit) and search is restarted,
-      //    as a result, file-2 will be included and `user_end` will be set to `f2l`;
-      // d. file-5 will never be included;
+      // a. file-1 is skipped at first (see above);
+      // b. but, when file-2 is encountered `user_begin` is set to `f2s` (file-2-start), and search is restarted,
+      //    so file-1 is included (and `user_begin` will be set to `f1s`).
+      // c. similarly, when file3 is encountered, `user_end` is set to `f3l` (file3-limit);
+      // d. as a result, file-4 will be included;
+      // e. file-5 will never be included;
       //
-      // why expand the range like that? 
-      // I guess, for compaction, it would be incorrect if we only compact file-3 and file-4 to level-1, leaving 
+      // why expand the range like that?
+      // Answer: for compaction, it would be incorrect if we only compact file-3 and file-4 to level-1, leaving
       // file-1 and file-2 in level-0: file-3 or file-4 contains newer versions of keys than file-1 and file-2;
+      // 类似于本函数前面注释的情形。
+      //
+      //Yuanguo: Version::PickLevelForMemTableOutput()调用本函数时，传入的level肯定 > 0；
 
       if (level == 0) {
         // Level-0 files may overlap each other.  So check if the newly
@@ -666,16 +927,32 @@ std::string Version::DebugString() const {
 // of edits to a particular state without creating intermediate
 // Versions that contain full copies of the intermediate state.
 //
-// Yuanguo: apply a sequence of edits (added files or deleted files) to 
-//   version `base_` (or called current), forming a new version `v`, see how it's used in 
-//   `VersionSet::LogAndApply`:
+// Yuanguo:
+//   VersionSet::Builder applies a sequence of edits (added files or deleted files) to version `base_` (or called current), 
+//   forming a new version `v`. It's used in VersionSet::Recover() and VersionSet::LogAndApply();
 //
+//   VersionSet::Builder works like this:
 //       a. expand the edits, and store them in `LevelState levels_`, where
-//          each level keeps its added/deleted files (changes or edits), see function `Apply`;
-//       b. merge `base_` and these edits, saving to version `v`, see function `SaveTo`;
+//          each level keeps its added/deleted files (changes or edits), see function `VersionSet::Builder::Apply()`;
+//       b. merge `base_` and these edits, saving to version `v`, see function `VersionSet::Builder::SaveTo()`;
 //
-//   that is, `base_` ----> edit1, edit2, edit3, ... editN ----> `v`, without intermediate versions like
-//            `base_` ----> edit1 ----> `v1` ----> edit2 ----> `v2` ----> ... ---> `v`
+//   that is, `base_` ----> edit1, edit2, edit3, ... editN ----> `v`;
+//
+//   注意：它不生成中间version，像这样:
+//             `base_` ----> edit1 ----> `v1`
+//       ----> edit2 ----> `v2`
+//       ----> ...
+//       ---> `v`
+//
+//   而是把edit1, edit2, edit3, ... editN先合并起来，再作用于`base_`上，得到`v`;
+//             `base_` ----> edit1, edit2, edit3, ... editN
+//       ----> `base_` ----> merged_edit{1..N} (就是VersionSet::Builder::LevelState levels_[config::kNumLevels]);
+//       ----> `v`
+//
+//   把edit1, edit2, edit3, ... editN合并起来产生merged_edit{1..N} (就是VersionSet::Builder::LevelState levels_[config::kNumLevels])
+//   的逻辑在函数VersionSet::Builder::Apply()中；
+//
+//   `base_` + merged_edit{1..N} = `v` 的逻辑在 VersionSet::Builder::SaveTo()中；
 class VersionSet::Builder {
  private:
   // Helper to sort by v->files_[file_number].smallest
@@ -755,6 +1032,7 @@ class VersionSet::Builder {
     // Add new files
     for (size_t i = 0; i < edit->new_files_.size(); i++) {
       const int level = edit->new_files_[i].first;
+      //Yuanguo: 拷贝构造一个新的 FileMetaData 对象；
       FileMetaData* f = new FileMetaData(edit->new_files_[i].second);
       f->refs = 1;
 
@@ -791,17 +1069,24 @@ class VersionSet::Builder {
       std::vector<FileMetaData*>::const_iterator base_end = base_files.end();
       const FileSet* added_files = levels_[level].added_files;
       v->files_[level].reserve(base_files.size() + added_files->size());
+      //Yuanguo:
+      //  对于当前level，
+      //      base_files = [10, 12, 15, 18, 23, 28, 30, 31]
+      //      added_files = [16, 29]
+      //  则按如下顺序调用MaybeAddFile():
+      //      10, 12, 15, {{16}}, 18, 23, 28, {{29}}, 30, 31
       for (const auto& added_file : *added_files) {
         // Add all smaller files listed in base_
         //
-        // Yuanguo: std::upper_bound returns first element in [`base_iter`, `base_end`) that's 
-        //   greater than `added_file`; 
+        // Yuanguo: std::upper_bound returns an iterator pointing to the first element in the range [first, last) that is greater than value,
+        //   or last if no such element is found.
+        //
         //   for example, base_files = [10, 12, 15, 18, 23, 28, 30, 31]
         //                added_file = 16;
         //                then bpos = 18;
         //   then [10, 12, 15] may be added to `v`
         //
-        //   For next round of loop, added_file = 29, 
+        //   For next round of loop, added_file = 29,
         //                then bpos = 30
         //   then [18, 23, 28] may be added to `v`
         for (std::vector<FileMetaData*>::const_iterator bpos =
@@ -871,7 +1156,22 @@ VersionSet::VersionSet(const std::string& dbname, const Options* options,
       descriptor_log_(nullptr),
       dummy_versions_(this),
       current_(nullptr) {
+  //Yuanguo:
+  //     +----prev---- dummy_versions_ ----next----+
+  //     |                  ^   ^                  |
+  //     |                  |   |                  |
+  //     +------------------+   +------------------+
   AppendVersion(new Version(this));
+  //Yuanguo:
+  //       +-----prev---------->---------------->----------------+
+  //       |                                                     |
+  //       |                                                     |
+  //       |                                        <----prev----+
+  // dummy_versions_   <----prev----   current_     ----next---->+
+  //       ^           ----next---->    empty                    |
+  //       |                                                     |
+  //       |                                                     |
+  //       +-------------------<----------------<-----next-------+
 }
 
 VersionSet::~VersionSet() {
@@ -882,6 +1182,16 @@ VersionSet::~VersionSet() {
 }
 
 void VersionSet::AppendVersion(Version* v) {
+  //Yuanguo:
+  //       +-----prev---------->---------------->----------------+
+  //       |                                                     |
+  //       |                                                     |
+  //       |                                        <----prev----+
+  // dummy_versions_   <----prev----   current_     ----next---->+
+  //       ^           ----next---->    empty                    |
+  //       |                                                     |
+  //       |                                                     |
+  //       +-------------------<----------------<-----next-------+
   // Make "v" current
   assert(v->refs_ == 0);
   assert(v != current_);
@@ -897,9 +1207,24 @@ void VersionSet::AppendVersion(Version* v) {
   v->next_ = &dummy_versions_;
   v->prev_->next_ = v;
   v->next_->prev_ = v;
+  //Yuanguo:
+  //       +-------prev------------------------>----------------------------->-------------------------+
+  //       |                                                                                           |
+  //       |                                                                                           |
+  //       |                                                                              <----prev----+
+  // dummy_versions_   <----prev----      vX        ----next---->         current_(vY)    ----next---->+
+  //       ^           ----next---->     empty      <----prev----                                      |
+  //       |                                                                                           |
+  //       |                                                                                           |
+  //       +------<----------------------------<----------------------------next-----------------------+
 }
 
-// Yuanguo: `current_` = apply `edit` on `current_`; `mu` is locked when calling this method;
+// Yuanguo: `current_` = apply `edit` on `current_`;
+//             (v2)                          (v1)
+//
+// 注意：下面说的SNAPSHOT和LOG是Raft中的语义；LevelDB中也有snapshot的概念，和这个不是一回事。
+//
+//     0. `mu` is locked before calling this method;
 //     1. `v` = apply `edit` on `current_`; See Builder;
 //     2. create file `new_manifest_file` (MANIFEST-XXXXXX);
 //     3. save SNAPSHOT (that is the `current_`, the base version) into `new_manifest_file`; NOTICE: SNAPSHOT (a version)
@@ -909,13 +1234,38 @@ void VersionSet::AppendVersion(Version* v) {
 //     6. sync `new_manifest_file` and save its name in "dbname/CURRENT" atomically (by save tmp file and rename);
 //     7. lock `mu`;
 //     8. AppendVersion(v), that is `current_ = v`;
-// NOTICE: 
+// NOTICE:
 //     a. version transition: persist it first, then update it in memory;
 //     b. essentially, this is "SNAPSHOT + LOG" model; base version is SNAPSHOT, `edit` is a list of LOGs; When
-//        recover (see function VersionSet::Recover): 
+//        recover (see function VersionSet::Recover):
 //               read name of `new_manifest_file` from "dbname/CURRENT";
 //               read content of `new_manifest_file`, which is "SNAPSHOT + LOGs";
 //               apply the edit on base version, and then we get current version;
+//
+// Yuanguo:
+//     dbname/CURRENT ----------------------->  +---------------------------------------+              +-----------+
+//                                              |            MANIFEST-XXXXXX            |        +---->|    sst    |
+//                                              +---------------------------------------+        |     +-----------+
+//                                              |                                       |        |
+//                                              |  SNAPSHOT(base_)                      |        |     +-----------+
+//                                              |  LOG(edit, or modification to base_)  | -------+---->|    sst    |
+//                                              |                                       |     +------->+-----------+
+//                                              |                                       |     |  |
+//                                              +---------------------------------------+     |  |     +-----------+
+//                                                                                            |  +---->|    sst    |
+//                                                                                            +--|---->+-----------+
+//                                              +---------------------------------------+     |  |
+//                                              |            MANIFEST-YYYYYY            |     |  +---->+-----------+
+//                                              +---------------------------------------+     +------->|    sst    |
+//                                              |                                       |     |        +-----------+
+//                                              |  SNAPSHOT(base_)                      | ----+
+//                                              |  LOG(edit, or modification to base_)  |     |        +-----------+
+//                                              |                                       |     +------->|    sst    |
+//                                              |                                       |              +-----------+
+//                                              +---------------------------------------+
+//
+//                                              ......
+//
 Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   if (edit->has_log_number_) {
     assert(edit->log_number_ >= log_number_);
@@ -939,16 +1289,24 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   }
   Finalize(v);
 
+  //Yuanguo:
+  //  上面已经的 `v` = `current_` apply `edit`，其实就是新version；
+  //  下面保存新version的时候，保存的是`current_`(见WriteSnapshot函数)和`edit`；为什么不直接保存`v`呢？
+  //      因为正常情况下，descriptor_log_ != nullptr，对应的manifest中，已经保存了current_;
+  //      这里只是把增量追加到descriptor_log_(manifest)中；
+
   // Initialize new descriptor log file if necessary by creating
   // a temporary file that contains a snapshot of the current version.
   std::string new_manifest_file;
   Status s;
 
-  // Yuanguo: if descriptor_log_ != nullptr, there is an open manifest file, which
-  //   contains SNAPSHOT (a base version) and a sequence of LOG's (edit), so we don't
-  //   need to WriteSnapshot; this may happen when reuse manifest after recover; see
-  //        VersionSet::Recover --> 
-  //        VersionSet::ReuseManifest;
+  //Yuanguo:
+  //   只有Recover的时候descriptor_log_ == nullptr才成立:
+  //        系统重启时，切换一下manifest文件。
+  //   一般情况下，manifest文件不切换(除了重启时，还有其他切换manifest的场景吗？)。例如，一个table file产生时，
+  //   要产生一个新Version，调用本函数时，descriptor_log_是current_manifest的句柄，不为nullptr，
+  //        - 往里追加一条VersionEdit (持久化新Version);
+  //        - 然后AppendVersion() (改内存，使新Version可见);
   if (descriptor_log_ == nullptr) {
     // No reason to unlock *mu here since we only hit this path in the
     // first call to LogAndApply (when opening the database).
@@ -988,6 +1346,8 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
     mu->Lock();
   }
 
+  // Yuanguo: 已经把 version v 持久化了(持久化的是 之前的 `current`和`edit`，它们合起来就是`v`)，
+  //     现在修改内存状态：v变成current_;
   // Install the new version
   if (s.ok()) {
     AppendVersion(v);
@@ -1007,7 +1367,27 @@ Status VersionSet::LogAndApply(VersionEdit* edit, port::Mutex* mu) {
   return s;
 }
 
-// Yuanguo: see my comments for VersionSet::LogAndApply() above;
+//Yuanguo:
+//打开LevelDB数据库(1.第一次创建;2.重启)的时候调用本函数，
+//    DB::Open() -->
+//    DBImpl::Recover() -->
+//    VersionSet::Recover()
+//
+//调用本函数的前提状态：
+//    - 调用本函数的时候，*this (VersionSet) 刚被DB::Open() -> new DBImpl() -> new VersionSet() 构造出来，
+//      所以current_是空的，即这样：
+//                                 +-----prev---------->---------------->----------------+
+//                                 |                                                     |
+//                                 |                                                     |
+//                                 |                                        <----prev----+
+//                           dummy_versions_   <----prev----   current_     ----next---->+
+//                                 ^           ----next---->    empty                    |
+//                                 |                                                     |
+//                                 |                                                     |
+//                                 +-------------------<----------------<-----next-------+
+//    - 无论是LevelDB数据库第一次创建，还是重启，都满足(见DBImpl::Recover()中的注释):
+//          - 都有dbname_/CURRENT文件;
+//          - dbname_/CURRENT文件的内容是"MANIFEST-000000X\n"，指向manifest文件"dbname_/MANIFEST-000000X";
 Status VersionSet::Recover(bool* save_manifest) {
   struct LogReporter : public log::Reader::Reporter {
     Status* status;
@@ -1018,6 +1398,7 @@ Status VersionSet::Recover(bool* save_manifest) {
 
   // Read "CURRENT" file, which contains a pointer to the current manifest file
   std::string current;
+  //Yuanguo: 读dbname_/CURRENT，其内容是"MANIFEST-000000X\n";
   Status s = ReadFileToString(env_, CurrentFileName(dbname_), &current);
   if (!s.ok()) {
     return s;
@@ -1025,9 +1406,10 @@ Status VersionSet::Recover(bool* save_manifest) {
   if (current.empty() || current[current.size() - 1] != '\n') {
     return Status::Corruption("CURRENT file does not end with newline");
   }
-  // Yuanguo: remove the trailing '\n';
+  //Yuanguo: remove the trailing '\n'，变成: "MANIFEST-000000X"
   current.resize(current.size() - 1);
 
+  //Yuanguo: 在前面拼上"dbname_/"，变成: "dbname_/MANIFEST-000000X";
   std::string dscname = dbname_ + "/" + current;
   SequentialFile* file;
   s = env_->NewSequentialFile(dscname, &file);
@@ -1047,9 +1429,13 @@ Status VersionSet::Recover(bool* save_manifest) {
   uint64_t last_sequence = 0;
   uint64_t log_number = 0;
   uint64_t prev_log_number = 0;
+  //Yuanguo: *this (VersionSet) 刚被DB::Open() -> new DBImpl() -> new VersionSet() 构造出来，所以current_是空的。
   Builder builder(this, current_);
 
   {
+    //Yuanguo: 读文件"dbname_/MANIFEST-000000X"，把读到的内容(内容是VersionEdit对象的列表)Apply到builder;
+    //   - 若是LevelDB第一次创建，这里面只有一个VersionEdit{log_number_ = 0;  next_file_number_ = 2; last_sequence_ = 0; ...}记录，见DBImpl::NewDB();
+    //   - 否则，若是重启，里面可能有多个VersionEdit记录，是VersionSet::LogAndApply()写入的；
     LogReporter reporter;
     reporter.status = &s;
     log::Reader reader(file, &reporter, true /*checksum*/,
@@ -1114,11 +1500,23 @@ Status VersionSet::Recover(bool* save_manifest) {
   }
 
   if (s.ok()) {
+    //Yuanguo: buidler中是current_(empty) + 从dbname_/MANIFEST-000000X文件中读出的VersionEdit；
+    //  所以，可以构造出重启之前的current_;
     Version* v = new Version(this);
     builder.SaveTo(v);
     // Install recovered version
     Finalize(v);
     AppendVersion(v);
+    //Yuanguo: AppendVersion(v)之后，Version链表一定是这样的：
+    //      dummy_versions_    <-------->  empty_version  <--------> current_(v)
+    //
+    //  empty_version : 是在DB::Open() -> new DBImpl() -> new VersionSet()构造的空的Version;
+    //  current_(v)   : 是empty_version + dbname_/MANIFEST-000000X中的VersionEdit;
+    //
+    //  假如是重启：
+    //        current_(v)：重启之前的current_;
+    //  假如是第一次创建LevelDB:
+    //        current_(v)：empty_version + DBImpl::NewDB()中创建的VersionEdit;
     manifest_file_number_ = next_file;
     next_file_number_ = next_file + 1;
     last_sequence_ = last_sequence;
@@ -1127,6 +1525,14 @@ Status VersionSet::Recover(bool* save_manifest) {
 
     // See if we can reuse the existing MANIFEST file.
     if (ReuseManifest(dscname, current)) {
+      //Yuanguo: reuse manifest，即current_不变：
+      //     - dbname_/CURRENT 的内容不变: "MANIFEST-000000X\n"
+      //     - 不产生新的 dbname_/MANIFEST-000000Y 文件；
+      //     - Version链表：dummy_versions_    <-------->  empty_version  <--------> current_
+      //
+      // 假如是新建的LevelDB数据库，一定会reuse，见ReuseManifest:
+      //      判断manifest文件的大小;
+      //      因为是新建的，所以dbname_/MANIFEST-0000001文件很小;
       // No need to save new manifest
     } else {
       *save_manifest = true;
@@ -1291,6 +1697,7 @@ uint64_t VersionSet::ApproximateOffsetOf(Version* v, const InternalKey& ikey) {
   return result;
 }
 
+//Yuanguo: 把所有version的所有level引用的table file的number放进live；
 void VersionSet::AddLiveFiles(std::set<uint64_t>* live) {
   for (Version* v = dummy_versions_.next_; v != &dummy_versions_;
        v = v->next_) {
@@ -1434,6 +1841,9 @@ Compaction* VersionSet::PickCompaction() {
 
   // Files in level 0 may overlap each other, so pick up all overlapping ones
   if (level == 0) {
+    //Yuanguo: level-0层内的文件可能重合，需要把所有可能重合的文件都找出来一起压缩，否则，
+    //  只compact一部分到level-1，而留一部分在level-0，就可能导致某写key的过时版本被留在
+    //  level-0，而最新版本被压缩到level-1；这样Get的时候就返回过时版本。
     InternalKey smallest, largest;
     GetRange(c->inputs_[0], &smallest, &largest);
     // Note that the next call will discard the file we placed in
@@ -1468,6 +1878,17 @@ bool FindLargestKey(const InternalKeyComparator& icmp,
 
 // Finds minimum file b2=(l2, u2) in level file for which l2 > u1 and
 // user_key(l2) = user_key(u1)
+// Yuanguo: 例如 largest_key = foo:999:kTypeValue
+//    在level_files找最小的f, 满足: f->smallest = foo:X:*   (X<999)
+//
+//    也就是说：如果level_files中有:
+//        f1->smallest = foo:900:*
+//        f2->smallest = foo:998:*
+//        f3->smallest = foo:725:*
+//    则返回f2；
+//
+//    注意，根据InternalKeyComparator的定义:
+//        foo:999:* < foo:998:* < foo:900:* < foo:725:*
 FileMetaData* FindSmallestBoundaryFile(
     const InternalKeyComparator& icmp,
     const std::vector<FileMetaData*>& level_files,
@@ -1502,6 +1923,22 @@ FileMetaData* FindSmallestBoundaryFile(
 // parameters:
 //   in     level_files:      List of files to search for boundary files.
 //   in/out compaction_files: List of files to extend by adding boundary files.
+//Yuanguo: 先看GetOverlappingInputs()函数前面的注释。
+//Yuanguo: 假如:
+//   - level_层内有文件：f1, f2, f3, f4, f5, f6，按从小到大排列；
+//   - c->inputs_[0]: 是level_层内将要参与comapct的文件，例如: f2,f3
+//   - f3的最大key是u1，f4的最小key是l2，并且user_key(u1) = user_key(l2);
+//   - 此时要把f4也加入compact；
+//   - 如果f4和f5也满足同样的关系，则f5也要加入compact；
+//   - 依次类推……
+// 为什么呢？例如，
+//   - f3的最大key是"foo:999:kTypeValue"; f4的最小key是"foo:998:kTypeValue"; 注意：InternalKeyComparator定义的顺序，user_key相同，seq大的在前小的在后，
+//     即 foo:999:* < foo:998:*
+//   - 最新版本应该是"foo:999:kTypeValue";
+//   - 假如把f3 compact到level_ + 1 层，而f4还留在level_层，则Get会返回过时版本"foo:998:kTypeValue"，
+//     因为Get是逐层搜索。
+// 相反，左边不需要类似的扩展。
+//Yuanguo: 见GetOverlappingInputs函数前面注释关于"清晰"和"模糊"的定义。右边界清晰是压缩正确性的保障。本函数就是确保右边界清晰。
 void AddBoundaryInputs(const InternalKeyComparator& icmp,
                        const std::vector<FileMetaData*>& level_files,
                        std::vector<FileMetaData*>* compaction_files) {
@@ -1514,6 +1951,17 @@ void AddBoundaryInputs(const InternalKeyComparator& icmp,
 
   bool continue_searching = true;
   while (continue_searching) {
+    // Yuanguo: 例如 largest_key = foo:999:kTypeValue
+    //   FindSmallestBoundaryFile()在level_files找最小的f, 满足: f->smallest = foo:X:*  (X<999)
+    //
+    //    也就是说：如果level_files中有:
+    //        f1->smallest = foo:900:*
+    //        f2->smallest = foo:998:*
+    //        f3->smallest = foo:725:*
+    //    则返回f2；
+    //
+    //    注意，根据InternalKeyComparator的定义:
+    //        foo:999:* < foo:998:* < foo:900:* < foo:725:*
     FileMetaData* smallest_boundary_file =
         FindSmallestBoundaryFile(icmp, level_files, largest_key);
 
@@ -1531,18 +1979,116 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   const int level = c->level();
   InternalKey smallest, largest;
 
+  //Yuanguo: 见GetOverlappingInputs函数前面注释关于"清晰"和"模糊"的定义。右边界清晰是压缩正确性的保障。这里就是确保右边界清晰。
+  //Yuanguo: 假如:
+  //   - level_层内有文件：f1, f2, f3, f4, f5, f6，按从小到大排列；
+  //   - c->inputs_[0]: 是level_层内将要参与comapct的文件，例如: f2,f3
+  //   - f3的最大key是u1，f4的最小key是l2，并且user_key(u1) = user_key(l2);
+  //   - 此时要把f4也加入compact；
+  //   - 如果f4和f5也满足同样的关系，则f5也要加入compact；
+  //   - 依次类推……
+  // 为什么呢？例如，
+  //   - f3的最大key是"foo:999:kTypeValue"; f4的最小key是"foo:998:kTypeValue"; 注意：InternalKeyComparator定义的顺序，user_key相同，seq大的在前小的在后，
+  //     即 foo:999:* < foo:998:*
+  //   - 最新版本应该是"foo:999:kTypeValue";
+  //   - 假如把f3 compact到level_ + 1 层，而f4还留在level_层，则Get会返回过时版本"foo:998:kTypeValue"，
+  //     因为Get是逐层搜索。
+  // 相反，左边不需要类似的扩展。
   AddBoundaryInputs(icmp_, current_->files_[level], &c->inputs_[0]);
+  //Yuanguo: 至此，第level层的table files已经确定了。
+  //         经过GetOverlappingInputs和上面的扩展，smallest/largest可能已经变了 (和VersionSet::CompactRange中的begin/end相比);
+  //         VersionSet::CompactRange中的begin/end只是选择level层table files的"提示信息"：实际选择的时候，可能解决overlap引入的扩展(level=0)，
+  //         也可能截断(level>0)，还有上面为了使右边界清晰引入的扩展。
+  //         无论如何，现在第level层的table files已经选定了，VersionSet::CompactRange中的begin/end也就没有用了。
+  //         下面取出的`smallest`和`largest`是level层的精确边界：左边可能是模糊的，右边一定是清晰的 (关于模糊和清晰的定义，见GetOverlappingInputs前的注释)。
   GetRange(c->inputs_[0], &smallest, &largest);
 
+  //Yuanguo: 现在有了level层的边界[smallest, largest]，
+  //         在level+1层，找这个边界"占据"的区间。
+  //
+  //例1：
+  //                                       smallest             largest
+  //     level:                               |--f2--| ... |--f4--|
+  //     level+1:               |---F1---|       |----F2-------|     |---F3---|
+  //
+  //     c->inputs_[0] = [f2, f3, f4]
+  //     c->inputs_[1] = [F2]
+  //
+  //例2：
+  //                                       smallest             largest
+  //     level:                               |--f2--| ... |--f4--|
+  //     level+1:                      |---F1---| |----F2-----| |---F3---|
+  //
+  //     c->inputs_[0] = [f2, f3, f4]
+  //     c->inputs_[1] = [F1, F2, F3]
+  //
+  //例3：
+  //     level:        f1                f2                 f3                 f4             f5
+  //              [a:555, d:777]    [d:716,  g:553]    [h:812, k:654]    [k:650, m:800]   [n:828, p:700]
+  //
+  //     level+1:      F1               F2              F3               F4              F5               F6        
+  //              [a:414, b:433]   [b:431, d:480]   [d:471, h:492]   [h:487, m:499]   [m:490, n:455]  [n:411,  q:400]
+  //
+  //     c->inputs_[0] = [f2, f3, f4]        ----> 左边模糊，右边清晰
+  //        smallest = d:716
+  //        largest  = m:800
+  //     c->inputs_[1] = [F2, F3, F4, F5]    ----> 左右两边都模糊，没有关系
+  //
+  //     注意：
+  //       1. "占据"是按user key来判断的(虽然smallest和largest都是internal key，但是GetOverlappingInputs只使用user key部分)，所以F2和F5都被占据。
+  //       2. 压缩不能产生比b:433更新的b，即b:x(x>433)。否则，压缩之后level+1层变成下面这样，就不是有序的了：
+  //                          F1          ...               F*                        ...
+  //                      [a:414, b:433]  ...   [*:*, ..., b的更高版本, ..., *:*]     ...
+  //          当然，不会出现这样的情况，因为：
+  //                - c->inputs_[0]中没有b:*，否则F1就被"占据"了；
+  //                - 而c->inputs_[1]中最新的是b:431，所以产生的最高版本的b是b:431；
+  //       3. 压缩可以产生比n:411更新的n。在我们这个例子中就发生了：
+  //                - n:455就比n:411更新;
+  //                - 且F5中还可能有n:456, n:457, ...;
+  //       4. c->inputs_[0]: 左边模糊右边清晰，保证了level层的正确性。
+  //       5. c->inputs_[1]: 左右两边都模糊，没有关系，level+1层还是正确的，因为：
+  //          压缩产生的新文件[Fx, ..., Fy]将"顶替"[F2, F3, F4, F5]的位置，且其中
+  //                - 最新版本的b是b:431 ( > F1.largest_internal_key)，因为c->inputs_[0]中没有b:*，否则F1被"占据"；
+  //                - 最老版本的n是n:455 ( < F6.smallest_internal_key)，因为c->inputs_[0]中没有n:*，否则F6被"占据"；
+  //           故level+1层还是有序无overlap的。
   current_->GetOverlappingInputs(level + 1, &smallest, &largest,
                                  &c->inputs_[1]);
 
+  //Yuanguo: 下面是一个优化而已：
+  //       若在level+1层选择的文件不变的情况下，能够扩展一下level层，还满足上面所述的关系，那就扩展一下。
   // Get entire range covered by compaction
   InternalKey all_start, all_limit;
   GetRange2(c->inputs_[0], c->inputs_[1], &all_start, &all_limit);
 
   // See if we can grow the number of inputs in "level" without
   // changing the number of "level+1" files we pick up.
+  //
+  // Yuanguo:
+  // Case-1：
+  //     level:         |--f1--|   |--f2--|   |--f3--|    |--f4--|    |--f5--|      |--f6--|
+  //     level+1:                |------------------fc----------------------------|
+  //
+  //     c->inputs_[0] = [f3, f4]
+  //     c->inputs_[1] = [fc]
+  // 可以把c->inputs_[0]扩展为 [f2, f3, f4, f5]，而c->inputs_[1]保持不变。
+  //
+  // Case-2：
+  //     level:         |--f1--|   |--f2--|   |--f3--|    |--f4--|    |--f5--|      |--f6--|
+  //     level+1:         |-----fb---| |------------fc----------------------------|
+  //
+  //     c->inputs_[0] = [f3, f4]
+  //     c->inputs_[1] = [fc]
+  // 可以把c->inputs_[0]扩展为 [f3, f4, f5]，而c->inputs_[1]保持不变。但不能把f2扩进去。
+  //
+  // Case-3：
+  //     level:         |--f1--|   |--f2--|   |--f3--|    |--f4--|    |--f5--|      |--f6--|
+  //     level+1:         |-----fb---| |------------fc---------------------|
+  //
+  //     c->inputs_[0] = [f3, f4]
+  //     c->inputs_[1] = [fc]
+  // 不可以把c->inputs_[0]扩展。
+  //
+  // 注意：扩展时要确保右边界是清晰的(调用AddBoundaryInputs函数)，因为这是正确性的保障。
   if (!c->inputs_[1].empty()) {
     std::vector<FileMetaData*> expanded0;
     current_->GetOverlappingInputs(level, &all_start, &all_limit, &expanded0);
@@ -1580,6 +2126,31 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
                                    &c->grandparents_);
   }
 
+  // Yuanguo:
+  //     - c->inputs_[0]的右边界是清晰的；左边界可能模糊；
+  //     - c->inputs_[1]的两边都可能模糊；
+  //     - c->grandparents_的两边都可能模糊；
+  //
+  // Yuanguo: 我通过实验，能够证实"c->inputs_[0]左边界可能模糊，c->inputs_[1]的两边都可能模糊"。实验是这样的：
+  //     - 线程T1: 循环put k-0000000000 到 k-0099999999; val为1KB；
+  //     - 线程T2: 循环db->GetSnapshot并持有0-20分钟(随机)；
+  //               因为只有持有snapshot，压缩中才需要保留多版本，见DBImpl::DoCompactionWork()及其中的注释；
+  //               只有保留了多版本，才能形成模糊的边界；
+  //     - 线程T3: 循环随机生成一个range，调用db->CompactRange(...)来压缩它。然后睡眠10-30分钟。
+  //     经过一段时间之后，发现:
+  //
+  //       1. c->inputs_[0]左边界是模糊的案例：level 2->3的压缩，level=2中的[fx]参与压缩，fx-1没参与压缩;
+  //                                               fx-1                                                   fx
+  //          level=2: ...,  [k-0067640127:1224513964, k-0069030877:1225202609]   [k-0069030877:1223966066, k-0072713310:1224705779], ...
+  //
+  //       2. c->inputs_[1]左边界是模糊的案例：level 2->3的压缩，level=3中的[Fy]参与压缩，Fy-1没参与压缩。
+  //                                               Fy-1                                                  Fy
+  //          level=3: ..., [k-0054891798:1127586311, k-0055046139:1147581221]    [k-0055046139:1136429341, k-0055103531:1137547804], ...
+  //
+  //       3. c->inputs_[1]右边界是模糊的案例：level 2->3的压缩，level=3中的[Fz]参与压缩，Fz+1没参与压缩。
+  //                                                Fz                                                   Fz+1
+  //          level=3: ..., [k-0049863471:1138372165, k-0050074683:1139138136]    [k-0050074683:1135341691, k-0050171661:1139083604], ...
+
   // Update the place where we will do the next compaction for this level.
   // We update this immediately instead of waiting for the VersionEdit
   // to be applied so that if the compaction fails, we will try a different
@@ -1588,6 +2159,19 @@ void VersionSet::SetupOtherInputs(Compaction* c) {
   c->edit_.SetCompactPointer(level, largest);
 }
 
+//Yuanguo: 尽管本函数名字叫做CompactRange，它其实一点压缩的工作也没做，只是
+// 在level层和level+1层各选择一些table file参与压缩而已。
+//      level:    fM, fM+1, ..., fM+x
+//      level+1:  fN, fN+1, ..., fN+y
+// 这些文件会被压缩成:
+//      level+1:  fO, fO+1, ..., fO+z
+//
+// 它是这么选择table files的：
+//     step-1: 根据begin和end在第level层选择一些table files；注：
+//                 若level=0，由于table file之间可能overlap，所以会扩展(扩展逻辑在GetOverlappingInputs中)；
+//                 若level>0，若选择的table file的总size太大，则截断一部分(截断逻辑在本函数中)；
+//     step-2: 若第level层选择的table files的右边界是"模糊"的，使之"清晰"(逻辑在SetupOtherInputs->AddBoundaryInputs中)
+//     step-3: 现在第level层的table files确定了；根据它们，确定第level+1层的table files;
 Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
                                      const InternalKey* end) {
   std::vector<FileMetaData*> inputs;
@@ -1600,6 +2184,8 @@ Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
   // But we cannot do this for level-0 since level-0 files can overlap
   // and we must not pick one file and drop another older file if the
   // two files overlap.
+  // Yuanguo: 对于level>0，本来GetOverlappingInputs()选择的table file列表就可能是"右边界模糊"的(见GetOverlappingInputs前面的注释)。
+  //   经过下面的"截断"，右边界仍然是模糊的。
   if (level > 0) {
     const uint64_t limit = MaxFileSizeForLevel(options_, level);
     uint64_t total = 0;
@@ -1614,6 +2200,13 @@ Compaction* VersionSet::CompactRange(int level, const InternalKey* begin,
   }
 
   Compaction* c = new Compaction(options_, level);
+  //Yuanguo: 假如current_ (current version)在compact的过程中，又产生了新的version（例如immutable memtable flush下来），怎么办呢？
+  //
+  //                               +------ compact ----------> version.x+1
+  //                               |
+  //   current_ (version.x)  ------+
+  //                               |
+  //                               +------ new version ------> version.x+1
   c->input_version_ = current_;
   c->input_version_->Ref();
   c->inputs_[0] = inputs;

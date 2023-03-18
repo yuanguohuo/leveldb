@@ -60,6 +60,16 @@ Slice FilterBlockBuilder::Finish() {
   return Slice(result_);
 }
 
+//Yuanguo: 调到本函数的时候，
+//  result_: 本Table累积到前一个DataBlock(包括前一个DataBlock的)的所有的filter data;
+//  start_, keys_: 当前DataBlock的keys数据，结构是这样的：
+//                    keys_是一个string:   abcdefghijklmn
+//                                         ^  ^     ^
+//                                         |  |     |
+//                    start_是一个vector:  0  3     9
+//
+//                    这表示3个key:  "abc", "defghi", "jklmn"
+//                    每个key的start是keys_[i]; 长度是start_[i+1] - start_[i] (除了最后一个);
 void FilterBlockBuilder::GenerateFilter() {
   const size_t num_keys = start_.size();
   if (num_keys == 0) {
@@ -69,6 +79,14 @@ void FilterBlockBuilder::GenerateFilter() {
   }
 
   // Make list of keys from flattened key structure
+  //
+  // Yuanguo:
+  //                    keys_是一个string:   abcdefghijklmn
+  //                                         ^  ^     ^
+  //                                         |  |     |
+  //                    start_是一个vector:  0  3     9     14       <-- start_.push_back(14);
+  //
+  // Yuanguo: 这样以来，最后一个key的长度也满足: start_[i+1] - start_[i]
   start_.push_back(keys_.size());  // Simplify length computation
   tmp_keys_.resize(num_keys);
   for (size_t i = 0; i < num_keys; i++) {
@@ -78,6 +96,25 @@ void FilterBlockBuilder::GenerateFilter() {
   }
 
   // Generate filter for current set of keys and append to result_.
+  //
+  // Yuanguo:
+  //            result_--> +--------------------------------------------+
+  //                       |filter-0: for block 0,1,2                   |
+  //                       +--------------------------------------------+
+  //                       |filter-6: for block 3                       |
+  //                       +--------------------------------------------+
+  //                       | 当前filter，即filter-7，还未生成           |
+  //
+  //
+  //   filter_offsets_ --> +--------------------------------------------+
+  //                       |offset_[0]  filter-0 offset (4B)            |
+  //                       |offset_[1]  empty (4B)                      |
+  //                       |offset_[2]  empty (4B)                      |
+  //                       |offset_[3]  empty (4B)                      |
+  //                       |offset_[4]  empty (4B)                      |
+  //                       |offset_[5]  empty (4B)                      |
+  //                       |offset_[6]  filter-6 offset (4B)            |
+  //                       |offset_[7]  filter-7 offset (4B)            | <-- 现在记录result_的size，就是filter-7的offset;
   filter_offsets_.push_back(result_.size());
   policy_->CreateFilter(&tmp_keys_[0], static_cast<int>(num_keys), &result_);
 
@@ -125,13 +162,13 @@ void FilterBlockBuilder::GenerateFilter() {
 //             |offset_[7]  filter-7 offset (4B)            |
 //             |            ......                          |
 //             |offset_[N]  filter-N offset (4B)            |
-//             +--------------------------------------------+
+//  footer --> +--------------------------------------------+
 //             |last_word: gap between data_ and offset_(4B)|
 //             +--------------------------------------------+
 //             |base_lg_ (1B)                               |
 //             +--------------------------------------------+
 //
-//             block-X => filter-Y  if  block-X-offset >> base_lg_ == Y
+//             block-X ===> filter-Y  if  block-X-offset >> base_lg_ == Y
 //
 FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
                                      const Slice& contents)
@@ -143,6 +180,10 @@ FilterBlockReader::FilterBlockReader(const FilterPolicy* policy,
   if (last_word > n - 5) return;
   data_ = contents.data();
   offset_ = data_ + last_word;
+  //Yuanguo:
+  //   n-5             : contents全部 - footer之后的部分，即data_到footer之间的部分；
+  //   n-5 - last_word : data_到footer之间的部分 - data_到offset_之间的部分 = offset_到footer之间的部分；
+  //   /4              : offset_数组的size；
   num_ = (n - 5 - last_word) / 4;
 }
 

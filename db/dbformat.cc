@@ -44,6 +44,24 @@ const char* InternalKeyComparator::Name() const {
   return "leveldb.InternalKeyComparator";
 }
 
+//Yuanguo: 注意比较的时候，不是直接按字节比较rep_，而是:
+//    - 使用user的comparator去比较user_key部分，ascending;
+//    - 若相等，按比较 "seq<<8|type" 部分，descending;
+//          - 按seq的降序:              akey.seq > bkey.seq，返回-1;  akey.seq < bkey.seq，返回+1；
+//          - 若相等，再按type的降序:   akey.type > bkey.type，返回-1;  akey.type < bkey.type，返回+1；
+//  为什么按降序？是这样的：
+//    - user调用 DBImpl::NewIterator()获取一个Iterator，其实是获取了一个DB的Snapshot; 
+//    - Snapshot就是一个seq，例如998;
+//    - 之后，DB有新的修改: seq = 999， 1000， 1001, ...；
+//    - 但user不应该看到这些新的修改；他应该只能看到998以前的修改：998, 997, 996, ...
+//    - 例如对于同一个user_key = foo; 有两个修改: foo:998, foo:1000，按降序
+//            foo:1000在前，foo:998在后
+//    - 所以user的Iterator Seek(foo:998)的时候，就直接跳过了foo:1000
+//
+//  type也是同一个道理：
+//       foo:998:kTypeValue(1)在前，foo:998:kTypeDeletion(0)在后
+//  使用 Seek(foo:998:kValueTypeForSeek(1))的时候，能够看到 foo:998:kTypeValue(1) 和 foo:998:kTypeDeletion(0)
+//  问题：什么情况下，两个修改的seq相同？
 int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const {
   // Order by:
   //    increasing user key (according to user-supplied comparator)
@@ -85,7 +103,7 @@ void InternalKeyComparator::FindShortestSeparator(std::string* start,
     //
     // Yuanguo: because internal keys are sorted by 
     //              user_key ascending order;
-    //              type|seq desecending ordr;
+    //              type|seq descending ordr;
     // this is the earliest/smallest internal key for user_key=tmp
     PutFixed64(&tmp,
                PackSequenceAndType(kMaxSequenceNumber, kValueTypeForSeek));
@@ -128,6 +146,17 @@ bool InternalFilterPolicy::KeyMayMatch(const Slice& key, const Slice& f) const {
   return user_policy_->KeyMayMatch(ExtractUserKey(key), f);
 }
 
+//Yuanguo:
+//           4字节                                                       1B       7B
+//   +--------------------+--------------------------------------------+----+-----------------+
+//   | "user_key的长度+8" |               user_key的数据               |type| seq(低字节在前) |
+//   +--------------------+--------------------------------------------+----+-----------------+
+//   ^    即后面总长度    ^                                                                   ^
+//   |                    |                                                                   |
+// start_              kstart_                                                               end_
+//
+//  注意：PackSequenceAndType() 生成的是： seq << 8 | type
+//        EncodeFixed64() 是低位在前，所以最终type在最前；
 LookupKey::LookupKey(const Slice& user_key, SequenceNumber s) {
   size_t usize = user_key.size();
   size_t needed = usize + 13;  // A conservative estimate

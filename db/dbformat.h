@@ -148,11 +148,19 @@ class InternalKey {
   //                                          +--------------+--+
   //                                         high              low
   //
-  // Yuanguo: order by 
-  //      Primary   : user_key asending;
-  //      Secondary : seq+type descending; why?
-  // for example:
-  //      "A"|*|*   <   "B"|*|*   <   "C"|4|*   <   "C"|3|*
+  //Yuanguo: 注意比较的时候，不是直接按字节比较rep_，而是(int InternalKeyComparator::Compare(const Slice& akey, const Slice& bkey) const):
+  //    - 使用user的comparator去比较user_key部分，ascending;
+  //    - 若相等，按比较 "seq<<8|type" 部分，desecending;
+  //          - 按seq的降序:              akey.seq > bkey.seq，返回-1;  akey.seq < bkey.seq，返回+1；
+  //          - 若相等，再按type的降序:   akey.type > bkey.type，返回-1;  akey.type < bkey.type，返回+1；
+  //  为什么按降序？是这样的：
+  //    - user调用 DBImpl::NewIterator()获取一个Iterator，其实是获取了一个DB的Snapshot; 
+  //    - Snapshot就是一个seq，例如998;
+  //    - 之后，DB有新的修改: seq = 999， 1000， 1001, ...；
+  //    - 但user不应该看到这些新的修改；他应该只能看到998以前的修改：998, 997, 996, ...
+  //    - 例如对于同一个user_key = foo; 有两个修改: foo:998, foo:1000，按降序
+  //            foo:1000在前，foo:998在后
+  //    - 所以user的Iterator Seek(foo:998)的时候，就直接跳过了foo:1000
   std::string rep_;
 
  public:
@@ -229,6 +237,19 @@ class LookupKey {
   //                                    <-- end_
   // The array is a suitable MemTable key.
   // The suffix starting with "userkey" can be used as an InternalKey.
+  //Yuanguo:
+  //           4字节                                                       1B       7B
+  //   +--------------------+--------------------------------------------+----+-----------------+
+  //   | "user_key的长度+8" |               user_key的数据               |type| seq(低字节在前) |
+  //   +--------------------+--------------------------------------------+----+-----------------+
+  //   ^    即后面总长度    ^                                                                   ^
+  //   |                    |                                                                   |
+  // start_              kstart_                                                               end_
+  //
+  //  注意：PackSequenceAndType() 生成的是： seq << 8 | type
+  //        EncodeFixed64() 是低位在前，所以最终type在最前；
+  //
+  //Yuanguo: 在内存中的排列并不重要，因为 InternalKeyComparator::Compare() 并不是把它当做 byte array 来比较，而是解析出来比：
   const char* start_;
   const char* kstart_;
   const char* end_;

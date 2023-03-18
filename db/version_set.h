@@ -172,6 +172,10 @@ class Version {
   int refs_;          // Number of live refs to this version
 
   // List of files per level
+  // Yuanguo:
+  //    files_[0]：第0层的 FileMetaData* vector；
+  //    files_[1]：第1层的 FileMetaData* vector；
+  //    ...
   std::vector<FileMetaData*> files_[config::kNumLevels];
 
   // Next file to compact based on seek stats.
@@ -323,6 +327,7 @@ class VersionSet {
   uint64_t manifest_file_number_;
   uint64_t last_sequence_;
   uint64_t log_number_;
+  //Yuanguo: 新版的LevelDB不再使用prev_log_number_，见DBImpl::Recover()中的注释。
   uint64_t prev_log_number_;  // 0 or backing store for memtable being compacted
 
   // Opened lazily
@@ -350,9 +355,13 @@ class Compaction {
   VersionEdit* edit() { return &edit_; }
 
   // "which" must be either 0 or 1
+  // Yuanguo: inputs_[0]:  level_ 层的文件列表；
+  // Yuanguo: inputs_[1]:  level_+1 层的文件列表；
+  // 即返回level_+which层有多少个文件；
   int num_input_files(int which) const { return inputs_[which].size(); }
 
   // Return the ith input file at "level()+which" ("which" must be 0 or 1).
+  // Yuanguo: 返回level_+which层的第i个文件；
   FileMetaData* input(int which, int i) const { return inputs_[which][i]; }
 
   // Maximum size of files to build during this compaction.

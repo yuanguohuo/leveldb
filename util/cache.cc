@@ -43,14 +43,28 @@ namespace {
 struct LRUHandle {
   void* value;
   void (*deleter)(const Slice&, void* value);
+  //Yuanguo: 连接同一吊桶里的LRUHandle对象，它们的hash值相同。
   LRUHandle* next_hash;
+  //Yuanguo: 一个LRUHandle实例在LRUCache中(in_cache=true)，它有两种状态：
+  //   1. in_cache=true && refs=1: 在cache中且只有1个引用(cache对它的引用)，即没有外部使用者，所以它存在于LRUCache::lru_链表中，随时可以被淘汰；
+  //   2. in_cache=true && refs>1: 在cache中，且除了cache对它的引用，还有外部使用者，所以它存在于LRUCache::in_use_链表中，不可以被淘汰；
+  //next和prev是用于LRUCache::lru_或者LRUCache::in_use_的；
+  //当然，一个LRUHandle还有第3中状态：游离于LRUCache之外;
+  //   3. in_cache=false && refs >=1:
+  //          a. 调用LRUCache::Insert()时，LRUCache没有空间，就直接构造一个游离于LRUCache之外的元素e给user；
+  //          b. e之前在LRUCache中，但通过LRUCache::Erase()删除了。
+  //      注意：游离于LRUCache之外的e，还是要通过LRUCache::Release来析构，因为它是通过LRUCache::Insert构造的：
+  //          一来这样对称，二来user根本不用关心e是否在cache中(只需要记住：构造的时候调用LRUCache::Insert，析
+  //          构的时候调用LRUCache::Release);
   LRUHandle* next;
   LRUHandle* prev;
   size_t charge;  // TODO(opt): Only allow uint32_t?
   size_t key_length;
   bool in_cache;     // Whether entry is in the cache.
   uint32_t refs;     // References, including cache reference, if present.
+  //Yuanguo: 有点奇怪，hash表(即class HandleTable)完全不管hash值怎么计算，由使用者自己计算，存在这个字段中。
   uint32_t hash;     // Hash of key(); used for fast sharding and comparisons
+  //Yuanguo: key是一个char数组，但结构体中只存储第一个char，后续部分紧跟着结构体；依赖key_length来确定后面还有多长。
   char key_data[1];  // Beginning of key
 
   Slice key() const {
@@ -183,6 +197,11 @@ class LRUCache {
   mutable port::Mutex mutex_;
   size_t usage_ GUARDED_BY(mutex_);
 
+  //Yuanguo: 一个LRUHandle实例e，无论是在LRUCache::lru_中，还是在LRUCache::in_use_中，都是
+  //  在LRUCache中，都满足:
+  //       e.in_cache = true;
+  //       e.refs中有一个数量1表示在LRUCache中;
+
   // Dummy head of LRU list.
   // lru.prev is newest entry, lru.next is oldest entry.
   // Entries have refs==1 and in_cache==true.
@@ -282,12 +301,27 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   std::memcpy(e->key_data, key.data(), key.size());
 
   if (capacity_ > 0) {
+    //Yuanguo: 有空间，但把e放进之后可能超: 先把e放进去（若真超了，下面再淘汰）;
+    //   由于e被放进cache，所以返回的是e满足:
+    //       - e.refs = 2 (cache持有一个引用；返回给user一个引用，所以2个);
+    //       - e.in_cache = true，表示在cache中;
+    //       - e在this的in_use_链表中，表示除了cache引用e之外，e还有别的使用者，即user；
     e->refs++;  // for the cache's reference.
     e->in_cache = true;
     LRU_Append(&in_use_, e);
     usage_ += charge;
+    //Yuanguo: table_.Insert(e)可能是替换一个元素(和e有相同的key)，若是这样，erase被替换的元素。
     FinishErase(table_.Insert(e));
   } else {  // don't cache. (capacity_==0 is supported and turns off caching.)
+    //Yuanguo: cache没有空间了，返回一个游离于cache之外的元素e；
+    //   - 本质上，返回的e和cache没有一点关系了；
+    //   - 但user并不知道(除非他去检查e.refs和e.in_cache);
+    //   - 所以，user想释放e，还是调用cache的Release(e);
+    //
+    // 虽然e从来没有存在于cache中，但构造和析构是通过LRUCache::Insert/Release来完成的。这样也是对称的。
+    // 其实，user根本不用关心e是否在cache中，他只需要记住：构造的时候调用LRUCache::Insert，析构的时候
+    // 调用LRUCache::Release;
+    //
     // next is read by key() in an assert, so it must be initialized
     e->next = nullptr;
   }
@@ -303,6 +337,18 @@ Cache::Handle* LRUCache::Insert(const Slice& key, uint32_t hash, void* value,
   return reinterpret_cast<Cache::Handle*>(e);
 }
 
+//Yuanguo:
+//   一个LRUHandle的实例，若在cache中(in_cache=true)
+//        - 可能被相同key的新对象替换;
+//        - 可能被user显示地Erase;
+//        - 可能被淘汰;
+//        - 可能被Prune(和淘汰一样);
+//   它第一步从hash表中remove掉，第二步从cache中remove。这是两个抽象层的事。
+//   FinishErase函数完成第二步，所以它只管cache抽象层的事：
+//        - 从lru_或in_use_链表移除 (记住：在这俩链表之一，才是在cache中)
+//        - 标记为not in cache，即e->in_cache = false;
+//        - 递减usage_;
+//        - e->ref--;  记住：cache持有一个引用，现在从cache移除了，自然要减去；
 // If e != nullptr, finish removing *e from the cache; it has already been
 // removed from the hash table.  Return whether e != nullptr.
 bool LRUCache::FinishErase(LRUHandle* e) {
