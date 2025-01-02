@@ -1,0 +1,272 @@
+[
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/builder.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/builder.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/builder.cc",
+  "output": "CMakeFiles/leveldb.dir/db/builder.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/c.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/c.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/c.cc",
+  "output": "CMakeFiles/leveldb.dir/db/c.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/db_impl.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/db_impl.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/db_impl.cc",
+  "output": "CMakeFiles/leveldb.dir/db/db_impl.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/db_iter.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/db_iter.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/db_iter.cc",
+  "output": "CMakeFiles/leveldb.dir/db/db_iter.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/dbformat.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/dbformat.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/dbformat.cc",
+  "output": "CMakeFiles/leveldb.dir/db/dbformat.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/dumpfile.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/dumpfile.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/dumpfile.cc",
+  "output": "CMakeFiles/leveldb.dir/db/dumpfile.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/filename.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/filename.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/filename.cc",
+  "output": "CMakeFiles/leveldb.dir/db/filename.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/log_reader.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/log_reader.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/log_reader.cc",
+  "output": "CMakeFiles/leveldb.dir/db/log_reader.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/log_writer.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/log_writer.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/log_writer.cc",
+  "output": "CMakeFiles/leveldb.dir/db/log_writer.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/memtable.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/memtable.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/memtable.cc",
+  "output": "CMakeFiles/leveldb.dir/db/memtable.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/repair.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/repair.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/repair.cc",
+  "output": "CMakeFiles/leveldb.dir/db/repair.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/table_cache.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/table_cache.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/table_cache.cc",
+  "output": "CMakeFiles/leveldb.dir/db/table_cache.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/version_edit.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/version_edit.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/version_edit.cc",
+  "output": "CMakeFiles/leveldb.dir/db/version_edit.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/version_set.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/version_set.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/version_set.cc",
+  "output": "CMakeFiles/leveldb.dir/db/version_set.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/db/write_batch.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/write_batch.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/write_batch.cc",
+  "output": "CMakeFiles/leveldb.dir/db/write_batch.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/block_builder.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/block_builder.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/block_builder.cc",
+  "output": "CMakeFiles/leveldb.dir/table/block_builder.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/block.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/block.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/block.cc",
+  "output": "CMakeFiles/leveldb.dir/table/block.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/filter_block.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/filter_block.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/filter_block.cc",
+  "output": "CMakeFiles/leveldb.dir/table/filter_block.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/format.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/format.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/format.cc",
+  "output": "CMakeFiles/leveldb.dir/table/format.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/iterator.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/iterator.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/iterator.cc",
+  "output": "CMakeFiles/leveldb.dir/table/iterator.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/merger.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/merger.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/merger.cc",
+  "output": "CMakeFiles/leveldb.dir/table/merger.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/table_builder.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/table_builder.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/table_builder.cc",
+  "output": "CMakeFiles/leveldb.dir/table/table_builder.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/table.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/table.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/table.cc",
+  "output": "CMakeFiles/leveldb.dir/table/table.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/table/two_level_iterator.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/table/two_level_iterator.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/table/two_level_iterator.cc",
+  "output": "CMakeFiles/leveldb.dir/table/two_level_iterator.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/arena.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/arena.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/arena.cc",
+  "output": "CMakeFiles/leveldb.dir/util/arena.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/bloom.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/bloom.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/bloom.cc",
+  "output": "CMakeFiles/leveldb.dir/util/bloom.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/cache.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/cache.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/cache.cc",
+  "output": "CMakeFiles/leveldb.dir/util/cache.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/coding.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/coding.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/coding.cc",
+  "output": "CMakeFiles/leveldb.dir/util/coding.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/comparator.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/comparator.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/comparator.cc",
+  "output": "CMakeFiles/leveldb.dir/util/comparator.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/crc32c.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/crc32c.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/crc32c.cc",
+  "output": "CMakeFiles/leveldb.dir/util/crc32c.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/env.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/env.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/env.cc",
+  "output": "CMakeFiles/leveldb.dir/util/env.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/filter_policy.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/filter_policy.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/filter_policy.cc",
+  "output": "CMakeFiles/leveldb.dir/util/filter_policy.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/hash.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/hash.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/hash.cc",
+  "output": "CMakeFiles/leveldb.dir/util/hash.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/logging.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/logging.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/logging.cc",
+  "output": "CMakeFiles/leveldb.dir/util/logging.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/options.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/options.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/options.cc",
+  "output": "CMakeFiles/leveldb.dir/util/options.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/status.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/status.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/status.cc",
+  "output": "CMakeFiles/leveldb.dir/util/status.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/util/env_posix.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/env_posix.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/env_posix.cc",
+  "output": "CMakeFiles/leveldb.dir/util/env_posix.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_COMPILE_LIBRARY -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldb.dir/helpers/memenv/memenv.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/helpers/memenv/memenv.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/helpers/memenv/memenv.cc",
+  "output": "CMakeFiles/leveldb.dir/helpers/memenv/memenv.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++  -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/leveldbutil.dir/db/leveldbutil.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/db/leveldbutil.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/db/leveldbutil.cc",
+  "output": "CMakeFiles/leveldbutil.dir/db/leveldbutil.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/db_bench.dir/util/histogram.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/histogram.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/histogram.cc",
+  "output": "CMakeFiles/db_bench.dir/util/histogram.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/db_bench.dir/util/testutil.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/testutil.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/testutil.cc",
+  "output": "CMakeFiles/db_bench.dir/util/testutil.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/db_bench.dir/benchmarks/db_bench.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/benchmarks/db_bench.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/benchmarks/db_bench.cc",
+  "output": "CMakeFiles/db_bench.dir/benchmarks/db_bench.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/db_bench_sqlite3.dir/util/histogram.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/histogram.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/histogram.cc",
+  "output": "CMakeFiles/db_bench_sqlite3.dir/util/histogram.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/db_bench_sqlite3.dir/util/testutil.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/util/testutil.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/util/testutil.cc",
+  "output": "CMakeFiles/db_bench_sqlite3.dir/util/testutil.cc.o"
+},
+{
+  "directory": "/Users/yuanguo/workspace/code-reading/leveldb/build",
+  "command": "/Library/Developer/CommandLineTools/usr/bin/c++ -DLEVELDB_PLATFORM_POSIX=1 -I/Users/yuanguo/workspace/code-reading/leveldb/build/include -I/Users/yuanguo/workspace/code-reading/leveldb/. -I/Users/yuanguo/workspace/code-reading/leveldb/include  -fno-exceptions -fno-rtti -std=c++11 -arch arm64 -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX14.4.sdk -Werror -Wthread-safety -o CMakeFiles/db_bench_sqlite3.dir/benchmarks/db_bench_sqlite3.cc.o -c /Users/yuanguo/workspace/code-reading/leveldb/benchmarks/db_bench_sqlite3.cc",
+  "file": "/Users/yuanguo/workspace/code-reading/leveldb/benchmarks/db_bench_sqlite3.cc",
+  "output": "CMakeFiles/db_bench_sqlite3.dir/benchmarks/db_bench_sqlite3.cc.o"
+}
+]
