@@ -15,3 +15,5 @@ out/
 .filenametags
 .tags
 rebuild_workspace.sh
+compile_commands.json
+.ccls
