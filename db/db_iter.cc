@@ -358,7 +358,7 @@ void DBIter::Next() {
 //                       --> iter_::Seek("test-key-3:16") (即MergingIterator::Seek())
 //                                I1指向 test-key-4:21:kTypeValue  注意：test-key-3:20:kTypeValue 排在 "test-key-3:16" 之前，所以被直接调过；
 //                                I2指向 test-key-3:12:kTypeValue
-//                                I2指向 test-key-3:4:kTypeValue
+//                                I3指向 test-key-3:4:kTypeValue
 //           - 所以，iter_ (MergingIterator) 输出的序列是:
 //                                test-key-3:12:kTypeValue BB    --> 当前版本，输出
 //                                test-key-3:4:kTypeValue  AA    --> 过时版本

@@ -1935,7 +1935,7 @@ DB::~DB() = default;
 //              ├── CURRENT
 //              ├── LOCK
 //              ├── LOG
-//              └── MANIFEST-000002
+//              └── MANIFEST-0000002
 //
 //  8. 开始写入数据，当第一个memtable满时，DBImpl::Write() --> DBImpl::MakeRoomForWrite()，切换memtable以及对应的log/wal(如前所说，它们一一对应)
 //         - 分配log/wal文件号4并创建000004.log；分配之后，VersionSet::next_file_number_ = 5;
@@ -1947,7 +1947,7 @@ DB::~DB() = default;
 //                         1. 分配table file文件号5；分配之后，VersionSet::next_file_number_ = 6);
 //                         2. 把immtable memtable (DBImpl::imm_)写到table file，名为000005.ldb中，并sync；
 //                         3. 在edit2中记录对000005.ldb的引用;
-//                 C. edit2.log_number_ = 4，表示000004.log之前的log都被truncate了；
+//                 C. edit2.log_number_ = 4，表示000004.log之前的log都被truncate了(000003.log的内容被写到000005.ldb中了)；
 //                 D. LogAndApply: 
 //                         1. edit2.next_file_number_ = 6 (持久化文件号分配器，以便crash重启之后恢复VersionSet::next_file_number_)
 //                         2. 记: v3 = current_(v2) + edit2。
@@ -1976,7 +1976,7 @@ DB::~DB() = default;
 //     重点：
 //          - 不变式：dbname/CURRENT指向的manifest文件 (我们记为current_manifest) 中记录的内容叠加起来等于VersionSet::current_(即当前版本);
 //          - 新版本产生时，总是先更新current_manifest，再更新VersionSet::current_；反之不行，更新完VersionSet::current_之后就可见，
-//            若更新current_manifest失败，则相当于把为持久化的状态暴露出去了。
+//            若更新current_manifest失败，则相当于把未持久化的状态暴露出去了。
 //          - current_manifest保存着Version变迁的Snapshot和LOG；
 //          - current_manifest也会切换(例如重启时)；以 manifestX --> manifestY 的切换为例:
 //                - 先把manifestX的build成一个Version，相当于压缩成一个Snapshot并把Snapshot写到manifestY，见函数
@@ -2020,7 +2020,7 @@ DB::~DB() = default;
 //                       edit3.log_number_ = new_log_number = 8。
 //                表示8以前(不包括8)的log/wal，即000004.log，被truncate了;
 //
-//                再提示一遍：
+//                重点：
 //                    - R3.B中，把对000007.ldb的引用记录到edit3中了，它就是000004.log的内容;
 //                    - 现在truncate掉000004.log;
 //                    - 这2个操作，通过同一个edit3原子地持久化。也就是说，数据从000004.log转移到000007.ldb是原子的。
@@ -2055,7 +2055,7 @@ DB::~DB() = default;
 //             ├── LOCK
 //             ├── LOG
 //             ├── LOG.old
-//             └── MANIFEST-000006
+//             └── MANIFEST-0000006
 Status DB::Open(const Options& options, const std::string& dbname, DB** dbptr) {
   *dbptr = nullptr;
 

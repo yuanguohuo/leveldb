@@ -94,7 +94,7 @@ class VersionEdit {
   //  重要：truncate-log要和"对持久化的table file的引用"作为一个原子被持久化；
   //     - 持久化table file之后，立即崩溃也无所谓：这时log_number_没有更新，也没有任何Version/VersionEdit引用持久化的table file；
   //       所以，table file是一个无用的文件。重启之后，重新replay log，生成memtabe，再持久化成新的table file；
-  //     - 而一旦 log_number_ 和 "对持久化的table file的引用" 被原子地持久化，崩溃再重启时，就不replay truncate的log/wal，其对应的内容
+  //     - 而一旦 log_number_ 和 "对持久化的table file的引用" 被原子地持久化，崩溃再重启时，就不再replay truncated的log/wal，其对应的内容
   //       已经在持久化的table file中。
   //     - 本类(VersionEdit)就是原子地持久化log_number_ 和 "对持久化的table file的引用"
   //              - log_number_在这里;
